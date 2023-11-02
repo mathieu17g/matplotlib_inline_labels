@@ -3,6 +3,8 @@
 
 This package is inspired by [matplotlib-label-lines](https://github.com/cphyc/matplotlib-label-lines)
 
+It adds an automatic labels' x positions computed to avoid label's bounding boxes overlapping over lines 
+
 ```python
 import numpy as np
 from matplotlib import pyplot as plt
@@ -38,9 +40,22 @@ fig.show()
 ```
 ![Example](examples/example.png)
 
+If something goes wrong, a visual debug is available
+
+```python
+fig, ax = plt.subplots()
+
+for a in A: ax.semilogx(X, chi2(5).pdf(a * X), label=f"Line {a}")
+ax.set_ylim(top=0.12)
+add_inline_labels(ax, ppf=0.5, with_perlabel_progress=True, debug=True, fig_for_debug=fig)
+
+fig.show()
+```
+![Visual debug example](examples/example_debug.png)
 
 # TODO
-[ ] Handle the case of axis lims or scale modification after adding inline labels
-[ ] Create an option to search label's position keeping the label's bounding box sides intersecting the curve in their centers
-[ ] Avoid Line2D labels to overlap non Line2D objects -> Needs to build geometries for other objects
-[ ] Make it work for line with error bars
+- [X] Make it work for line with error bars
+- [ ] Handle the case of axis lims or scale modification after adding inline labels
+- [ ] Create an option to search label's position keeping the label's bounding box sides intersecting the curve in their centers
+- [ ] Avoid Line2D labels to overlap non Line2D objects -> Needs to build geometries for other objects
+
