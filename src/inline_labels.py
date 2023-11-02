@@ -1,13 +1,14 @@
 from IPython import get_ipython
-import pickle as pkl
 
-if (IS := get_ipython()) is not None:
-    IS.run_line_magic("matplotlib", "inline")
-import matplotlib as mpl
+if (IS := get_ipython()) is not None: IS.run_line_magic("matplotlib", "inline")
 from matplotlib import pyplot as plt
+from matplotlib.figure import Figure
 from matplotlib.axes import Axes
+from matplotlib.container import ErrorbarContainer
+from matplotlib.lines import Line2D
+from matplotlib.transforms import Transform, Affine2D
 from mpl_toolkits.axes_grid1 import Divider, Size
-from typing import Any, Tuple, Dict, Literal, Union, Callable, Optional, TypedDict
+from typing import Any, Tuple, Literal, Union, Callable, Optional, TypedDict
 from nptyping import NDArray, Shape, Float, Object
 from datetime import datetime as dt
 from matplotlib.dates import date2num, DateConverter
@@ -43,7 +44,6 @@ Line_Chunk_Geometries = TypedDict(
 Label_Box_Dimensions = TypedDict("Label_Box_Dimensions", {"box_w": float, "box_h": float})
 Label_Geom_Data = TypedDict("Label_Data", {"lcd": dict[int, Line_Chunk_Geometries], "boxd": Label_Box_Dimensions})
 Plot_Labels_Geom_Data = dict[str, Label_Geom_Data]
-Geometric_Library = Literal["pygeos", "shapely"]
 Rotation_Search_State = TypedDict(
     "Rotation_Search_State",  # Mono direction label rotation angle search state
     {
@@ -93,6 +93,22 @@ MLS_LCR_Candidates = dict[  # Multi level seperation label center and rotation c
 from operator import sub
 
 
+def retrieve_lines_and_labels(ax: Axes) -> tuple[list[Line2D], list[str]]:
+    """Retrieves line-like objects from an Axes and the corresponding labels"""
+    linelikeHandles, linelikeLabels = [], []
+    allHandles, allLabels = ax.get_legend_handles_labels()
+    for h, l in zip(allHandles, allLabels):
+        if isinstance(h, ErrorbarContainer):
+            line = h.lines[0]
+        elif isinstance(h, Line2D):
+            line = h
+        else:
+            continue
+        linelikeHandles.append(line)
+        linelikeLabels.append(l)
+    return linelikeHandles, linelikeLabels
+
+
 def get_axe_aspect(ax: Axes) -> float:
     """Computes the drawn data aspect radio of an Axe to circumvemt 'auto' value
     returned by matplotlib.axes.Axes.get_aspect.
@@ -107,7 +123,7 @@ def get_axe_aspect(ax: Axes) -> float:
     return disp_ratio / data_ratio
 
 
-def get_dbg_axes(ax: Axes) -> Tuple[Axes, Axes]:
+def get_dbg_axes(ax: Axes, fig_for_debug: Figure) -> Tuple[Axes, Axes]:
     """Build a debug figure with to axes :
     - ax_data with lines build on data and inline labels
     - ax_geoms with the geometries used in label placement
@@ -116,7 +132,7 @@ def get_dbg_axes(ax: Axes) -> Tuple[Axes, Axes]:
     plt.close("all")
     # Determine original Axes dimensions,
     # Solution found at https://stackoverflow.com/questions/19306510/determine-matplotlib-axis-size-in-pixels
-    ax_bbox = ax.get_window_extent().transformed(figx.dpi_scale_trans.inverted())
+    ax_bbox = ax.get_window_extent().transformed(fig_for_debug.dpi_scale_trans.inverted())
     ax_box_dim = max(ax_bbox.width, ax_bbox.height)
     fig_dbg = plt.figure(
         figsize=((ax_box_dim), (ax_box_dim)), dpi=ax.get_figure().get_dpi()
@@ -127,11 +143,27 @@ def get_dbg_axes(ax: Axes) -> Tuple[Axes, Axes]:
     vert = [Size.Fixed(ax_bbox.height)]
     divider = Divider(fig_dbg, pos, horiz, vert, aspect=False)
 
-    ax_data = fig_dbg.add_axes(divider.get_position(), axes_locator=divider.new_locator(nx=0, ny=0))
-    ax_geoms = fig_dbg.add_axes(divider.get_position(), axes_locator=divider.new_locator(nx=2, ny=0))
+    # Add the two Axes for debug drawing
+    # TODO maybe have to handle more specific characteristics from the original Axe beyond axis scales and limits
+    ax_data = fig_dbg.add_axes(
+        divider.get_position(),
+        axes_locator=divider.new_locator(nx=0, ny=0),
+        xscale=ax.get_xscale(),
+        yscale=ax.get_yscale(),
+        xlim=ax.get_xlim(),
+        ylim=ax.get_ylim(),
+    )
+    ax_geoms = fig_dbg.add_axes(
+        divider.get_position(),
+        axes_locator=divider.new_locator(nx=2, ny=0),
+        xscale=ax.get_xscale(),
+        yscale=ax.get_yscale(),
+        xlim=ax.get_xlim(),
+        ylim=ax.get_ylim(),
+    )
 
     for _, sub_ax in enumerate([ax_data, ax_geoms]):
-        for l in ax.get_lines():
+        for l in retrieve_lines_and_labels(ax)[0]:
             sub_ax.plot(*(l.get_data()), linewidth=l.get_linewidth(), label=l.get_label())
         # Rotate x-axis labels manually since autofmt_xdate does not work for multiple axes which are not separated into subplots,
         # Solution found at https://stackoverflow.com/questions/48078540/matplotlib-autofmt-xdate-fails-to-rotate-x-axis-labels-after-axes-cla-is-c
@@ -141,8 +173,9 @@ def get_dbg_axes(ax: Axes) -> Tuple[Axes, Axes]:
 
     ax_data.axis(ax.axis())
     ax_geoms.sharex(ax_data)
-    ax_data.set_aspect(get_axe_aspect(ax), adjustable="box")
-    ax_geoms.set_aspect(get_axe_aspect(ax), adjustable="datalim")
+    # TODO Commented because leads to wrong ax_geoms aspect -> figure out why I used that initially.
+    # ax_data.set_aspect(get_axe_aspect(ax), adjustable="box")
+    # ax_geoms.set_aspect(get_axe_aspect(ax), adjustable="datalim")
     fig_dbg.canvas.draw()
     return ax_data, ax_geoms
 
@@ -153,24 +186,24 @@ def get_dbg_axes(ax: Axes) -> Tuple[Axes, Axes]:
 #######################################################
 
 
-def get_disp2geom_trans(ax: mpl.axes.Axes) -> mpl.transforms.Transform:
+def get_disp2geom_trans(ax: Axes) -> Transform:
     """Returns a transformation from display coordinates to Axe coordinates scaled
     to be cartesian on display"""
     width, height = ax.get_window_extent().size
-    return ax.transAxes.inverted() + mpl.transforms.Affine2D().scale(1, height / width)
+    return ax.transAxes.inverted() + Affine2D().scale(1, height / width)
 
 
-def get_geom2disp_trans(ax: mpl.axes.Axes) -> mpl.transforms.Transform:
+def get_geom2disp_trans(ax: Axes) -> Transform:
     """Returns a transformation from Axe coordinates scaled to be cartesian on display,
     to display coordinates"""
     width, height = ax.get_window_extent().size
-    return mpl.transforms.Affine2D().scale(1, width / height) + ax.transAxes
+    return Affine2D().scale(1, width / height) + ax.transAxes
 
 
 #######################################################
 
 
-def get_axe_lines_widths(ax: Axes, handles, allLabels) -> dict[str, float]:
+def get_axe_lines_widths(ax: Axes, linelikeHandles, linelikeLabels) -> dict[str, float]:
     """Build a dictionary of line's width per label
     (note: linewidth for a Line2D object is given in points -> display coordinadates)
     Note : since I do not know how a linewidth is drawn internally by matplotlib
@@ -182,47 +215,80 @@ def get_axe_lines_widths(ax: Axes, handles, allLabels) -> dict[str, float]:
     # -> showing differences betwen points and pixels
     # - sdau answer at https://stackoverflow.com/questions/16649970/custom-markers-with-screen-coordinate-size-in-older-matplotlib
     # -> showing the function points_to_pixels to convert points into pixels
-    for l in allLabels:
-        lw_pts = handles[allLabels.index(l)].get_linewidth()
+    for l in linelikeLabels:
+        h = linelikeHandles[linelikeLabels.index(l)]
+        lw_pts = h.get_linewidth()
         lw_display = ax.get_figure().canvas.get_renderer().points_to_pixels(lw_pts)
         lw_geoms = (1 / ax.get_window_extent().width) * lw_display
         ld_lw.setdefault(l, lw_geoms)
     return ld_lw
 
 
-def get_axe_lines_geometries(ax: Axes, handles, allLabels, ld_lw: dict[str, float]) -> Plot_Labels_Geom_Data:
+def get_axe_lines_geometries(
+    ax: Axes, linelikeHandles, linelikeLabels, ld_lw: dict[str, float], nowarn: bool = True
+) -> Plot_Labels_Geom_Data:
     """Build a dictionary of (line chunks and bufferd line chunk) list
     (in Axes coordinates) for all labels
+
     Returns :
-    {<label>: {'lcd': {<line chunk index>: {'lc': <line chunk, 'lcb': <buffered line chunk>}}}}
+    `{<label>: {'lcd': {<line chunk index>: {'lc': <line chunk, 'lcb': <buffered line chunk>}}}}`
     """
-    ld = {l: {} for l in allLabels}
+    ld = {l: {} for l in linelikeLabels}
     trans_data2geom = ax.transData + get_disp2geom_trans(ax)
-    for l in allLabels:
-        # Verify that each drawn object is a Line2D
-        assert isinstance(handles[allLabels.index(l)], mpl.lines.Line2D)
+    for l in linelikeLabels:
+        h = linelikeHandles[linelikeLabels.index(l)]
         # Initialize current label's line chunk dictionary
         ld[l].setdefault("lcd", {})
         # Get the x and y data from Line2D object
-        l_xdata_dt, l_ydata = handles[allLabels.index(l)].get_data()
-        # Convert xdata from date_time to float
-        l_xdata_f = date2num(l_xdata_dt)
-        # Convert from Data coordinates to Axes coordindates
-        l_xydata_geom_coords = ma.masked_invalid(trans_data2geom.transform(np.c_[l_xdata_f, l_ydata]))
+        l_xdata_raw, l_ydata_raw = h.get_data(orig=False)
+        # Check that x and y data are either of type float or datetime64.
+        # And if of type datetime64, converts it to float
+        if l_xdata_raw.dtype == np.datetime64:
+            # Convert x data from date_time to float
+            l_xdata_f = date2num(l_xdata_raw)
+        elif l_xdata_raw.dtype == np.dtype("float64"):
+            l_xdata_f = l_xdata_raw
+        else:
+            raise ValueError(f"Line label: {l} has x data neither of type float or date, which is not handle for now")
+        if l_ydata_raw.dtype == np.datetime64:
+            # Convert y data from date_time to float
+            l_ydata_f = date2num(l_ydata_raw)
+        elif l_ydata_raw.dtype == np.dtype("float64"):
+            l_ydata_f = l_ydata_raw
+        else:
+            raise ValueError(f"Line label: {l} has y data neither of type float or date, which is not handle for now")
+        # Convert from Data coordinates to Axes coordinates
+        l_xydata_geom_coords = ma.masked_invalid(trans_data2geom.transform(np.c_[l_xdata_f, l_ydata_f]))
+        # Axe ax_geoms box in geometry coordinates, in a shape compatible with shapely.clip_by_rect function
+        axe_box = shp.box(*np.concatenate(trans_data2geom.transform(np.c_[ax.get_xlim(), ax.get_ylim()])))
+        shp.prepare(axe_box)
         if (seqlen := len(ma.clump_unmasked(l_xydata_geom_coords[:, 1]))) > 1:
-            warnings.warn(f"Line {l} is splitted in {seqlen} continuous chunks")
-        for i, s in enumerate(ma.clump_unmasked(l_xydata_geom_coords[:, 1])):
-            # if seqlen > 1: print(f'Seq length = {s.stop - s.start}')
+            if not nowarn:
+                print(f"Line {l} of Axe {ax.get_title()} is splitted in {seqlen} continuous chunks")
+        i = 0
+        for s in ma.clump_unmasked(l_xydata_geom_coords[:, 1]):
             if s.stop - s.start == 1:
-                lc = shp.points(l_xydata_geom_coords[s.start].data)
+                lc = shp.intersection(shp.points(l_xydata_geom_coords[s.start].data), axe_box)
             else:
-                lc = shp.linestrings(ma.compress_rows(l_xydata_geom_coords[s.start : s.stop]))
-            shp.prepare(lc)
-            lcb = shp.buffer(lc, ld_lw[l] / 2)
-            shp.prepare(lcb)
-            ld[l]["lcd"].setdefault(i, {"lc": lc, "lcb": lcb})
-            ld[l]["lcd"][i].setdefault("lcp", lc)
-            ld[l]["lcd"][i].setdefault("lcbp", lcb)
+                lc = shp.intersection(shp.linestrings(ma.compress_rows(l_xydata_geom_coords[s.start : s.stop])), axe_box)
+            if not shp.is_empty(lc):
+                if shp.get_num_geometries(lc) > 1:
+                    for lc_piece in lc.geoms:
+                        shp.prepare(lc_piece)
+                        lc_pieceb = shp.buffer(lc_piece, ld_lw[l] / 2)
+                        shp.prepare(lc_pieceb)
+                        ld[l]["lcd"].setdefault(i, {"lc": lc_piece, "lcb": lc_pieceb})
+                        ld[l]["lcd"][i].setdefault("lcp", lc_piece)
+                        ld[l]["lcd"][i].setdefault("lcbp", lc_pieceb)
+                        i += 1
+                else:
+                    shp.prepare(lc)
+                    lcb = shp.buffer(lc, ld_lw[l] / 2)
+                    shp.prepare(lcb)
+                    ld[l]["lcd"].setdefault(i, {"lc": lc, "lcb": lcb})
+                    ld[l]["lcd"][i].setdefault("lcp", lc)
+                    ld[l]["lcd"][i].setdefault("lcbp", lcb)
+                    i += 1
     return ld
 
 
@@ -259,7 +325,9 @@ def plot_geometric_line_chunks(ax_geoms: Axes, ld: Plot_Labels_Geom_Data):
     ax_geoms.get_figure().canvas.draw()
 
 
-def update_ld_with_label_text_box_dimensions(ax, handles, allLabels, ld, l, **l_text_kwarg) -> Tuple[float, float]:
+def update_ld_with_label_text_box_dimensions(
+    ax, linelikeHandles, linelikeLabels, ld, l, **l_text_kwarg
+) -> Tuple[float, float]:
     """Updates line data structure with text label box dimensions
 
     {<label>: {'lcd': {
@@ -278,7 +346,7 @@ def update_ld_with_label_text_box_dimensions(ax, handles, allLabels, ld, l, **l_
         0.5,
         l,
         transform=ax.transAxes,
-        color=handles[allLabels.index(l)].get_color(),
+        color=linelikeHandles[linelikeLabels.index(l)].get_color(),
         clip_on=False,
         backgroundcolor=ax.get_facecolor(),
         horizontalalignment="center",
@@ -498,7 +566,7 @@ def rtl_box_intersects_olcl(
     )
 
 
-# BEGIN DEBUG
+#! BEGIN DEBUG
 import functools
 import time
 
@@ -516,7 +584,7 @@ def timer(func):
     return wrapper_timer
 
 
-# END DEBUG
+#! END DEBUG
 
 
 # Find intersections on line chunk at half label box length distance from label center position candidate
@@ -547,9 +615,9 @@ def hlbld_intersections_on_lc_from_lcc(cl: list[Point2D], hw: float, lc: shp.Geo
         0
     ]  # ; print(f'{lcc_indices_with_particular_intersections=}')
     for idx in lcc_indices_with_particular_intersections:
-        # BEGIN DEBUG
+        # TODO BEGIN DEBUG
         assert intersection_points_number[idx] > 2
-        # END DEBUG
+        # TODO END DEBUG
         if intersection_points_number[idx] > 2:
             intersections = shp.get_parts(intersection_points[idx])  # ; print(f'{intersections=}')
             c_dist = shp.line_locate_point(lc, center_pts_candidates[idx])  # ; print(f'{c_dist=}')
@@ -736,13 +804,15 @@ def plot_label_centers_position_candidates(
 
 def add_inline_labels(
     ax: Axes,
-    ppf: float = 0.5,
+    ppf: float = 1,
     with_overall_progress: bool = False,
     overall_progress_desc: str = "Label placement",
     with_perlabel_progress: bool = False,
+    nowarn: bool = True,
     debug: bool = False,
+    fig_for_debug: Optional[Figure] = None,
     **l_text_kwarg,
-) -> Optional[mpl.figure.Figure]:
+) -> Optional[Figure]:
     """For an axe made of Line2D plots, draw the legend label for each line
     on it (centered on one of its points) without any intersection
     with any other line or some of its own missing data
@@ -751,15 +821,26 @@ def add_inline_labels(
     due to vector drawing from a discrete resolution. Visual errors disapear
     when viewed on a real image or by increasing the dpi.
 
-    Args:
-        ax (matplotlib.axes.Axes): Axe composed of Line2D objects, with a datetime.datetime x-axis
-        ppf (float): position precision factor, fraction of the label box height, itself depending on the font properties
-        with_overall_progress (bool): one progress bar for whole axe
-        with_perlabel_progress (bool): on progress bar per line
-        debug (bool): draws a figure showing the algorithm intermediate results
-    Returns:
-        List[datetime.datetime]: labels positions as x-axis values
+    ### Args:
+        - `ax` (`Axes`): Axe composed of Line2D objects, with a datetime.datetime x-axis
+        - `ppf` (`float`): position precision factor, fraction of the label box height, itself depending on the font properties
+        - `with_overall_progress` (`bool`): one progress bar for whole axe
+        - `with_perlabel_progress` (`bool`): on progress bar per line
+        - `nowarn` (`bool`): no warning for unplaced labels
+        - `debug` (`bool`): draws a figure showing the algorithm intermediate results
+        - `fig_for_debug` (`Figure` | `None`): matplotlib figure for debugging view
+
+    ### Returns:
+        `List[datetime]`: labels positions as x-axis values
     """
+
+    # Draw the figure before anything else
+    ax.get_figure().canvas.draw_idle()
+
+    # Check that the figure belonging to the provided Axe has been passed via fig_for_debug in case debug=True
+    if debug and fig_for_debug == None:
+        raise ValueError(f"`fig_for_debug` has to be provided in case `debug=True`")
+
     # Nested progress bar does not work in every case => set overall and per label progress option mutualy exclusive
     if with_overall_progress and with_perlabel_progress:
         raise ValueError(
@@ -768,25 +849,29 @@ def add_inline_labels(
 
     # Build a debug figure
     if debug:
-        ax_data, ax_geoms = get_dbg_axes(ax)
+        ax_data, ax_geoms = get_dbg_axes(ax, fig_for_debug)
 
     #############################
     # Retrieve lines and labels #
     #############################
+
     # Verify that x axis is a data axis
-    assert isinstance(ax.xaxis.converter, DateConverter)
-    # Retrieve Line2D objects and their labels
-    handles, allLabels = ax.get_legend_handles_labels()
+    # TODO investigate why the verification below has been added in 2020. Commented meanwhile
+    # assert isinstance(ax.xaxis.converter, DateConverter)
+
+    # Retrieve linelike objects and their labels
+    linelikeHandles, linelikeLabels = retrieve_lines_and_labels(ax)
     if debug:
-        data_handles, data_allLabels = ax_data.get_legend_handles_labels()
+        data_linelikeHandles, data_linelikeLabels = retrieve_lines_and_labels(ax_data)
 
     ########################################################################
     # Transform curves into geometric object for label placement computing #
     ########################################################################
+
     # Build a dictionary of line's width per label
-    ld_lw = get_axe_lines_widths(ax, handles, allLabels)
+    ld_lw = get_axe_lines_widths(ax, linelikeHandles, linelikeLabels)
     # Build a dictionary of (line chunks and bufferd line chunk) list (in Axes coordinates) for all labels
-    ld = get_axe_lines_geometries(ax, handles, allLabels, ld_lw)
+    ld = get_axe_lines_geometries(ax, linelikeHandles, linelikeLabels, ld_lw, nowarn=nowarn)
     # Plot curves as geometric objects for DEBUG
     if debug:
         plot_geometric_line_chunks(ax_geoms, ld)
@@ -821,9 +906,11 @@ def add_inline_labels(
     ########################################################################
     # Identify labels' box geometry and position candidates per line chunk #
     ########################################################################
-    for l in allLabels:
+    for l in linelikeLabels:
         # Get the label text bounding box and x sampling points
-        l_box_w, l_box_h = update_ld_with_label_text_box_dimensions(ax, handles, allLabels, ld, l, **l_text_kwarg)
+        l_box_w, l_box_h = update_ld_with_label_text_box_dimensions(
+            ax, linelikeHandles, linelikeLabels, ld, l, **l_text_kwarg
+        )
         # Find all label position (box center) candidates per label's line chunks
         update_ld_with_label_position_candidates(ppf, ld, l, l_box_w, l_box_h)
 
@@ -848,7 +935,7 @@ def add_inline_labels(
     # TODO####################
     # TODO# Vectorize search #
     # TODO####################
-    for l in allLabels:
+    for l in linelikeLabels:
         for lc_idx in list(ld[l]["lcd"]):
             l_pcl = ld[l]["lcd"][lc_idx]["pcl"]
             l_hw = ld[l]["boxd"]["box_h"]
@@ -861,7 +948,7 @@ def add_inline_labels(
     #########################
 
     with overall_progress_cm as overall_pbar:
-        for l in allLabels:
+        for l in linelikeLabels:
             ###############################################################################################
             # Create current label's box helper geometries with translation and rotation helper functions #
             ###############################################################################################
@@ -1074,7 +1161,7 @@ def add_inline_labels(
                     l_x,
                     l_y,
                     l,
-                    color=handles[allLabels.index(l)].get_color(),
+                    color=linelikeHandles[linelikeLabels.index(l)].get_color(),
                     backgroundcolor=ax.get_facecolor(),
                     horizontalalignment="center",
                     verticalalignment="center",
@@ -1089,7 +1176,7 @@ def add_inline_labels(
                         l_y,
                         l,
                         fontproperties=fprop,
-                        color=data_handles[data_allLabels.index(l)].get_color(),
+                        color=data_linelikeHandles[data_linelikeLabels.index(l)].get_color(),
                         backgroundcolor=ax_data.get_facecolor(),
                         horizontalalignment="center",
                         verticalalignment="center",
@@ -1098,7 +1185,7 @@ def add_inline_labels(
                             boxstyle="square, pad=0.3",
                             mutation_aspect=1 / 10,
                             fc=ax_data.get_facecolor(),
-                            ec=data_handles[data_allLabels.index(l)].get_color(),
+                            ec=data_linelikeHandles[data_linelikeLabels.index(l)].get_color(),
                             lw=0.1,
                         ),
                         **l_text_kwarg,
@@ -1122,71 +1209,26 @@ def add_inline_labels(
                         transform=get_geom2disp_trans(ax_geoms),
                     )
 
+    #? Add a legend for all handles which are not line like artists according to function retrieve_lines_and_labels
+
     # Add legend with all labels than could not be positionned properly on their curve
-    if legend_labels:
+    if legend_labels and not nowarn:
         warnings.warn(f"Unplaced labels : {legend_labels}")
-    if legend_labels and (len(legend_labels) != len(allLabels)):
+    if legend_labels and (len(legend_labels) != len(linelikeLabels)):
         # legend_fs = fs if (not reduced_legend_fs) or ((fs_index := fs_list.index(fs)) == 0) else fs_list[fs_index - 1]
         if debug:
-            ax_data.legend(handles=[data_handles[data_allLabels.index(l)] for l in legend_labels], labels=legend_labels)
+            ax_data.legend(
+                handles=[data_linelikeHandles[data_linelikeLabels.index(l)] for l in legend_labels], labels=legend_labels
+            )
         ax.legend(
-            handles=[handles[allLabels.index(l)] for l in legend_labels], labels=legend_labels, facecolor=ax.get_facecolor()
+            handles=[linelikeHandles[linelikeLabels.index(l)] for l in legend_labels],
+            labels=legend_labels,
+            facecolor=ax.get_facecolor(),
         )
 
     if debug:
         return ax_data.get_figure()
-    # else: return ax.get_figure()
+    else:
+        return ax.get_figure()
 
 
-#######################################
-
-with open("MW links major opcos_without_labels.pickle", "rb") as fd:
-    figx = pkl.load(fd)
-figx.set_dpi(72)
-
-#######################################
-# Set labels x positions for graph #N #
-#######################################
-N = 12
-ax = figx.axes[N]
-if (IS := get_ipython()) is not None:
-    IS.run_line_magic(
-        "time",
-        "fig = add_inline_labels(ax, ppf=1/2, with_overall_progress=True, with_perlabel_progress=False, debug=True, fontsize='large')",
-    )
-# %%
-if __name__ == "__main__":
-    fig = add_inline_labels(
-        ax,
-        ppf=1 / 3,
-        with_overall_progress=True,
-        with_perlabel_progress=False,
-        debug=True,
-        fontsize="large",
-    )
-    fig.show()
-# %%
-figx
-# %%
-if (IS := get_ipython()) is not None:
-    IS.run_line_magic(
-        "time",
-        "graph_number_list = range(18)\nfor N in graph_number_list:\n    ax = figx.axes[N]\n    plt.close('all')\n    add_inline_labels(ax, \n                           ppf=1/2, \n                           with_overall_progress=True, \n                           overall_progress_desc=f'Graph number {N: >2}', \n                           debug=False, fontsize='large')",
-    )
-figx.savefig("MW_in_France_20231012_bis.png")
-figx
-
-# %%
-with open("MW links major opcos_without_labels.pickle", "rb") as fd:
-    figx = pkl.load(fd)
-figx.set_dpi(72)
-if (IS := get_ipython()) is not None:
-    IS.run_cell_magic(
-        "prun",
-        "-D with_pygeos_version_0.9_full_prepared_box_sides_not_included_buffered_boxes_prepared.prof",
-        "graph_number_list = range(18)\nfor N in graph_number_list:\n    ax = figx.axes[N]\n    add_inline_labels(ax, \n                           ppf=1/2, \n                           with_overall_progress=True, \n                           overall_progress_desc=f'Graph number {N: >2}', \n                           debug=False, fontsize='large')",
-    )
-
-# %%
-figx
-# %%
