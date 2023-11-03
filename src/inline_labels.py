@@ -1,6 +1,5 @@
-from IPython import get_ipython
-
-if (IS := get_ipython()) is not None: IS.run_line_magic("matplotlib", "inline")
+# from IPython import get_ipython
+# if (IS := get_ipython()) is not None: IS.run_line_magic("matplotlib", "inline")
 from matplotlib import pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.axes import Axes
@@ -1209,7 +1208,7 @@ def add_inline_labels(
                         transform=get_geom2disp_trans(ax_geoms),
                     )
 
-    #? Add a legend for all handles which are not line like artists according to function retrieve_lines_and_labels
+    # ? Add a legend for all handles which are not line like artists according to function retrieve_lines_and_labels
 
     # Add legend with all labels than could not be positionned properly on their curve
     if legend_labels and not nowarn:
@@ -1230,5 +1229,3 @@ def add_inline_labels(
         return ax_data.get_figure()
     else:
         return ax.get_figure()
-
-

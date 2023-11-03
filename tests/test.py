@@ -3,11 +3,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 from matplotlib.testing import setup
-import sys
-sys.path.append("../src/")
+import os, sys
+
+# sys.path.append("../src/")
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
 from inline_labels import add_inline_labels
 from datetime import datetime
 from matplotlib.dates import UTC, DateFormatter, DayLocator
+
 
 # %%
 @pytest.fixture()
@@ -15,8 +18,12 @@ def setup_mpl():
     setup()
     plt.clf()
 
+
+#! savefig_kwargs={"bbox_inches": "tight"} is necessary to properly save visual debug image
+
+
 # %%
-@pytest.mark.mpl_image_compare
+@pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
 def test_linspace(setup_mpl):
     x = np.linspace(0, 1)
     K = [1, 2, 4]
@@ -29,10 +36,12 @@ def test_linspace(setup_mpl):
     plt.ylabel("$f(x)$")
     return plt.gcf()
 
+
 _ = test_linspace(setup_mpl)
 
+
 # %%
-@pytest.mark.mpl_image_compare
+@pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
 def test_linspace_with_visualdebug(setup_mpl):
     x = np.linspace(0, 1)
     K = [1, 2, 4]
@@ -45,10 +54,12 @@ def test_linspace_with_visualdebug(setup_mpl):
     plt.ylabel("$f(x)$")
     return plt.gcf()
 
+
 _ = test_linspace_with_visualdebug(setup_mpl)
 
+
 # %%
-@pytest.mark.mpl_image_compare
+@pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
 def test_ylogspace(setup_mpl):
     x = np.linspace(0, 1)
     K = [1, 2, 4]
@@ -62,10 +73,12 @@ def test_ylogspace(setup_mpl):
     plt.ylabel("$f(x)$")
     return plt.gcf()
 
+
 _ = test_ylogspace(setup_mpl)
 
+
 # %%
-@pytest.mark.mpl_image_compare
+@pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
 def test_xlogspace(setup_mpl):
     x = np.linspace(0, 10)
     K = [1, 2, 4]
@@ -82,10 +95,12 @@ def test_xlogspace(setup_mpl):
     plt.ylabel("$f(x)$")
     return plt.gcf()
 
+
 _ = test_xlogspace(setup_mpl)
 
+
 # %%
-@pytest.mark.mpl_image_compare
+@pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
 def test_xylogspace(setup_mpl):
     x = np.geomspace(0.1, 1e1)
     K = np.arange(-5, 5, 2)
@@ -102,11 +117,13 @@ def test_xylogspace(setup_mpl):
     plt.ylabel("$f(x)$")
     return plt.gcf()
 
+
 _ = test_xylogspace(setup_mpl)
 
-# %% 
+
+# %%
 @pytest.mark.skip(reason="Label rotation with x or y limits modification not supported yet")
-@pytest.mark.mpl_image_compare
+@pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
 def test_rotation_correction(setup_mpl):
     # Fix axes limits and plot line
     fig, ax = plt.subplots()
@@ -120,18 +137,24 @@ def test_rotation_correction(setup_mpl):
 
     return fig
 
+
 _ = test_rotation_correction(setup_mpl)
 
+
 # %%
-@pytest.mark.mpl_image_compare
+@pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
 def test_vertical(setup_mpl):
     x = 0.5
     plt.axvline(x, label="axvline")
     add_inline_labels(plt.gca())
     return plt.gcf()
+
+
 _ = test_vertical(setup_mpl)
+
+
 # %%
-@pytest.mark.mpl_image_compare
+@pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
 def test_labels_range(setup_mpl):
     x = np.linspace(0, 1)
 
@@ -141,10 +164,12 @@ def test_labels_range(setup_mpl):
     add_inline_labels(plt.gca())
     return plt.gcf()
 
+
 _ = test_labels_range(setup_mpl)
 
+
 # %%
-@pytest.mark.mpl_image_compare
+@pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
 def test_dateaxis_naive(setup_mpl):
     dates = [datetime(2018, 11, 1), datetime(2018, 11, 2), datetime(2018, 11, 3)]
 
@@ -157,10 +182,12 @@ def test_dateaxis_naive(setup_mpl):
     add_inline_labels(plt.gca())
     return plt.gcf()
 
+
 _ = test_dateaxis_naive(setup_mpl)
 
+
 # %%
-@pytest.mark.mpl_image_compare
+@pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
 def test_dateaxis_advanced(setup_mpl):
     dates = [
         datetime(2018, 11, 1, tzinfo=UTC),
@@ -178,10 +205,12 @@ def test_dateaxis_advanced(setup_mpl):
     add_inline_labels(plt.gca())
     return plt.gcf()
 
+
 _ = test_dateaxis_advanced(setup_mpl)
 
+
 # %%
-@pytest.mark.mpl_image_compare
+@pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
 def test_polar(setup_mpl):
     t = np.linspace(0, 2 * np.pi, num=128)
     plt.plot(np.cos(t), np.sin(t), label="$1/1$")
@@ -192,10 +221,12 @@ def test_polar(setup_mpl):
     add_inline_labels(plt.gca())
     return plt.gcf()
 
+
 _ = test_polar(setup_mpl)
 
+
 # %%
-@pytest.mark.mpl_image_compare
+@pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
 def test_non_uniform_and_negative_spacing(setup_mpl):
     x = [1, -2, -3, 2, -4, -3]
     plt.plot(x, [1, 2, 3, 4, 2, 1], ".-", label="apples")
@@ -205,10 +236,12 @@ def test_non_uniform_and_negative_spacing(setup_mpl):
     add_inline_labels(plt.gca())
     return plt.gcf()
 
+
 _ = test_non_uniform_and_negative_spacing(setup_mpl)
 
+
 # %%
-@pytest.mark.mpl_image_compare
+@pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
 def test_errorbar(setup_mpl):
     x = np.linspace(0, 1, 20)
 
@@ -223,10 +256,12 @@ def test_errorbar(setup_mpl):
     add_inline_labels(plt.gca())
     return plt.gcf()
 
+
 _ = test_errorbar(setup_mpl)
 
+
 # %%
-@pytest.mark.mpl_image_compare
+@pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
 def test_negative_spacing(setup_mpl):
     x = np.linspace(1, -1)
     y = x**2
@@ -235,10 +270,12 @@ def test_negative_spacing(setup_mpl):
     add_inline_labels(plt.gca())
     return plt.gcf()
 
+
 _ = test_negative_spacing(setup_mpl)
 
+
 # %%
-@pytest.mark.mpl_image_compare
+@pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
 def test_label_datetime_plot(setup_mpl):
     plt.clf()
     # data from the chinook database of iTunes music sales
@@ -265,10 +302,12 @@ def test_label_datetime_plot(setup_mpl):
     add_inline_labels(plt.gca())
     return plt.gcf()
 
+
 _ = test_label_datetime_plot(setup_mpl)
 
+
 # %%
-@pytest.mark.mpl_image_compare
+@pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
 def test_auto_layout(setup_mpl):
     X = [[1, 2], [0, 1]]
     Y = [[0, 1], [0, 1]]
@@ -280,10 +319,12 @@ def test_auto_layout(setup_mpl):
     add_inline_labels(plt.gca())
     return plt.gcf()
 
+
 _ = test_auto_layout(setup_mpl)
 
+
 # %%
-@pytest.mark.mpl_image_compare
+@pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
 def test_errorbar_with_list(setup_mpl):
     np.random.seed(1234)
     fig, ax = plt.subplots(figsize=[10, 2])
@@ -300,11 +341,15 @@ def test_errorbar_with_list(setup_mpl):
     add_inline_labels(plt.gca(), fontsize="large")
     return fig
 
+
 _ = test_errorbar_with_list(setup_mpl)
 
+
 # %%
-@pytest.mark.skip(reason="For a Line 2D built with axhline, x data coordinates are in Axes coordinates. Cannot figure how to identify it among the Line2D of an Axes")
-@pytest.mark.mpl_image_compare
+@pytest.mark.skip(
+    reason="For a Line 2D built with axhline, x data coordinates are in Axes coordinates. Cannot figure how to identify it among the Line2D of an Axes"
+)
+@pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
 def test_labeling_axhline(setup_mpl):
     fig, ax = plt.subplots()
     ax.plot([10, 12, 13], [1, 2, 3], label="plot")
@@ -313,7 +358,5 @@ def test_labeling_axhline(setup_mpl):
     add_inline_labels(plt.gca(), debug=True, fig_for_debug=plt.gcf())
     return fig
 
-_ = test_labeling_axhline(setup_mpl)
 
-# %%
-# %%
+_ = test_labeling_axhline(setup_mpl)

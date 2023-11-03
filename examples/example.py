@@ -2,8 +2,9 @@
 import numpy as np
 from matplotlib import pyplot as plt
 from scipy.stats import chi2, loglaplace
-import sys
-sys.path.append("../src/")
+import os, sys
+
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
 from inline_labels import add_inline_labels
 
 X = np.linspace(0, 1, 500)
@@ -14,7 +15,8 @@ funcs = [np.arctan, np.sin, loglaplace(4).pdf, chi2(5).pdf]
 fig, axes = plt.subplots(ncols=2, nrows=3, constrained_layout=True, figsize=(8, 8))
 axes = axes.flatten()
 
-for a in A: axes[0].plot(X, np.arctan(a * X), label=f"Line {a}")
+for a in A:
+    axes[0].plot(X, np.arctan(a * X), label=f"Line {a}")
 add_inline_labels(axes[0], with_overall_progress=True, fontsize="large")
 
 for a in A:
@@ -33,9 +35,10 @@ fig.savefig("example.png")
 # %% Visual debug example
 fig, ax = plt.subplots()
 
-for a in A: ax.semilogx(X, chi2(5).pdf(a * X), label=f"Line {a}")
+for a in A:
+    ax.semilogx(X, chi2(5).pdf(a * X), label=f"Line {a}")
 ax.set_ylim(top=0.12)
-add_inline_labels(ax, ppf=0.5, with_perlabel_progress=True, debug=True, fig_for_debug=fig)
+fig_debug = add_inline_labels(ax, ppf=0.5, with_perlabel_progress=True, debug=True, fig_for_debug=fig)
 
-fig.savefig("example_debug.png")
+fig_debug.savefig("example_debug.png", bbox_inches="tight")
 # %%

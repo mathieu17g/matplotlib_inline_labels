@@ -3,7 +3,7 @@
 
 This package is inspired by [matplotlib-label-lines](https://github.com/cphyc/matplotlib-label-lines)
 
-It adds an automatic labels' x positions computed to avoid label's bounding boxes overlapping over lines 
+It adds automatic labels' x positions, computed to avoid labels' bounding boxes overlapping over lines.
 
 ```python
 import numpy as np
@@ -17,7 +17,6 @@ X = np.linspace(0, 1, 500)
 A = [1, 2, 5, 10, 20]
 funcs = [np.arctan, np.sin, loglaplace(4).pdf, chi2(5).pdf]
 
-# %% Examples
 fig, axes = plt.subplots(ncols=2, nrows=3, constrained_layout=True, figsize=(8, 8))
 axes = axes.flatten()
 
@@ -40,7 +39,7 @@ fig.show()
 ```
 ![Example](examples/example.png)
 
-If something goes wrong, a visual debug is available
+If something goes wrong, a visual debug is available:
 
 ```python
 fig, ax = plt.subplots()
