@@ -3,7 +3,7 @@
 
 This package is inspired by [matplotlib-label-lines](https://github.com/cphyc/matplotlib-label-lines)
 
-It adds automatic labels' x positions, computed to avoid labels' bounding boxes overlapping over lines.
+It adds automatic labels positionning, by avoidings labels bounding boxes to overlap over lines.
 
 ```python
 import numpy as np

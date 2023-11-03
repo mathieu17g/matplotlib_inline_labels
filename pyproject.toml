@@ -1,3 +1,40 @@
+[build-system]
+requires = ["flit"]
+build-backend = "flit.buildapi"
+
+[project]
+name = "matplotlib_inline_labels"
+version = "0.0.1"
+authors = [
+  { name="Mathieu Biskupski", email="mathieu.biskupski@icloud.com" },
+]
+description = "Inline line labels for matplotlib with automatic positionning"
+readme = "README.md"
+requires-python = ">=3.11"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Framework :: Matplotlib",
+    "Operating System :: OS Independent",
+    "Development Status :: 3 - Alpha",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/mathieu17g/matplotlib_inline_labels"
+"Bug Tracker" = "https://github.com/mathieu17g/matplotlib_inline_labels/issues"
+
+[tool.flit.module]
+name = "inlinelabels"
+
+[tool.black]
+line-length = 125
+
+[tool.coverage.run]
+branch = true
+
+[tool.coverage.report]
+fail_under = 90
+
 [tool.pytest.ini_options]
 python_files = "test*.py"
 filterwarnings = [
