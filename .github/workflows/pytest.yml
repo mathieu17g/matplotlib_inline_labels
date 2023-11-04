@@ -24,12 +24,12 @@ jobs:
             python-version: ${{ matrix.python }} 
         - name: Install dependencies
           run: |
-            pip install pytest
-            pip install pytest-cov
-            pip install pytest-mpl
+            python pip -m pip install --upgrade pip
             pip install -r requirements.txt
         - name: Test with pytest
-          run: pytest --mpl --mpl-results-path=tests\results --mpl-generate-summary=basic-html --cov=src --cov-report=xml --cov-fail-under=85 --timeout=300
+          run: |
+            pip install pytest pytest-cov pytest-mpl
+            pytest --mpl --mpl-results-path=tests\results --mpl-generate-summary=basic-html --cov=src --cov-report=xml --cov-fail-under=85 --timeout=300
         - name: Upload coverage reports to Codecov
           uses: codecov/codecov-action@v3
           env:
