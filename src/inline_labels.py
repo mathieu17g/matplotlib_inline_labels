@@ -179,10 +179,10 @@ def get_dbg_axes(ax: Axes, fig_for_debug: Figure) -> Tuple[Axes, Axes]:
     return ax_data, ax_geoms
 
 
-#######################################################
-# TODO create a transformation class transGeom linked #
-# to the Axe from which geometries where extracted    #
-#######################################################
+#########################################################
+# TODO create a transformation class transGeom linked   #
+# TODO to the Axe from which geometries where extracted #
+#########################################################
 
 
 def get_disp2geom_trans(ax: Axes) -> Transform:
@@ -1217,7 +1217,8 @@ def add_inline_labels(
         # legend_fs = fs if (not reduced_legend_fs) or ((fs_index := fs_list.index(fs)) == 0) else fs_list[fs_index - 1]
         if debug:
             ax_data.legend(
-                handles=[data_linelikeHandles[data_linelikeLabels.index(l)] for l in legend_labels], labels=legend_labels
+                handles=[data_linelikeHandles[data_linelikeLabels.index(l)] for l in legend_labels],
+                labels=legend_labels,
             )
         ax.legend(
             handles=[linelikeHandles[linelikeLabels.index(l)] for l in legend_labels],
