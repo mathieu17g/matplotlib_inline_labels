@@ -29,13 +29,18 @@ jobs:
             pip install -r requirements.txt
         - name: Install pytest with mpl and coverage extensions
           run: pip install pytest pytest-cov pytest-mpl
+        - name: Create test results and baseline directories
+          run: |
+            mkdir -p tests/pytest_mpl_results_${{ matrix.os }}_${{ matrix.python }}
+            mkdir -p tests/pytest_mpl_baseline_${{ matrix.os }}_${{ matrix.python }}
+            mkdir -p tests/pytest_mpl_new_baseline_${{ matrix.os }}_${{ matrix.python }}
         - name: Test with pytest
           run: >
             pytest 
             --color=yes 
             --mpl 
-            --mpl-results-path=tests/pytest_mpl_results 
-            --mpl-baseline-path=tests/pytest_mpl_baseline_${{ matrix.os }} 
+            --mpl-results-path=tests/pytest_mpl_results_${{ matrix.os }}_${{ matrix.python }}
+            --mpl-baseline-path=tests/pytest_mpl_baseline_${{ matrix.os }}_${{ matrix.python }} 
             --mpl-generate-summary=html 
             --cov=src 
             --cov-report=xml 
@@ -47,7 +52,7 @@ jobs:
             pytest 
             --color=yes 
             --mpl 
-            --mpl-generate-path=tests/pytest_mpl_new_baseline_${{ matrix.os }} 
+            --mpl-generate-path=tests/pytest_mpl_new_baseline_${{ matrix.os }}_${{ matrix.python }} 
             --last-failed
         # always attempt to upload artifacts, even
         # (and especially) in case of failure.
@@ -55,14 +60,14 @@ jobs:
           if: always()
           uses: actions/upload-artifact@v3
           with:
-            name: pytest_mpl_results
-            path: tests/pytest_mpl_results/*
+            name: pytest_mpl_results_${{ matrix.os }}_${{ matrix.python }}
+            path: tests/pytest_mpl_results_${{ matrix.os }}_${{ matrix.python }}/*
         - name: Upload pytest-mpl new baseline
           if: always()
           uses: actions/upload-artifact@v3
           with:
-            name: pytest_mpl_new_baseline_${{ matrix.os }}
-            path: tests/pytest_mpl_new_baseline_${{ matrix.os }}/*
+            name: pytest_mpl_new_baseline_${{ matrix.os }}_${{ matrix.python }}
+            path: tests/pytest_mpl_new_baseline_${{ matrix.os }}_${{ matrix.python }}/*
             if-no-files-found: ignore
         - name: Upload coverage reports to Codecov
           uses: codecov/codecov-action@v3
