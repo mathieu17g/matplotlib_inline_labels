@@ -30,21 +30,11 @@ jobs:
         - name: Test with pytest
           run: |
             pip install pytest pytest-cov pytest-mpl
-            pytest --color=yes \
-                   --mpl \
-                   --mpl-results-path=tests/pytest_mpl_results \
-                   --mpl-baseline-path=tests/pytest_mpl_baseline_${{ matrix.os }} \
-                   --mpl-generate-summary=html \
-                   --cov=src \
-                   --cov-report=xml \
-                   --cov-fail-under=85 \
-                   -rxXs # show extra info on xfailed, xpassed, and skipped tests
+            pytest --color=yes --mpl --mpl-results-path=tests/pytest_mpl_results --mpl-baseline-path=tests/pytest_mpl_baseline_${{ matrix.os }} --mpl-generate-summary=html --cov=src --cov-report=xml --cov-fail-under=85 -rxXs
         - name: Generate new image baseline
           if: failure()
           run: |
-            pytest --color=yes --mpl \
-                   --mpl-generate-path=tests/pytest_mpl_new_baseline_${{ matrix.os }} \
-                   --last-failed
+            pytest --color=yes --mpl --mpl-generate-path=tests/pytest_mpl_new_baseline_${{ matrix.os }} --last-failed
         # always attempt to upload artifacts, even
         # (and especially) in case of failure.
         - name: Upload pytest-mpl report
