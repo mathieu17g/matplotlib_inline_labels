@@ -99,7 +99,7 @@ _ = test_xlogspace(setup_mpl)
 
 
 # %%
-@pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
+@pytest.mark.mpl_image_compare(savefig_kwargs={})#"bbox_inches": "tight"})
 def test_xylogspace(setup_mpl):
     x = np.geomspace(0.1, 1e1)
     K = np.arange(-5, 5, 2)
