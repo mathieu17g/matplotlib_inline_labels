@@ -109,7 +109,8 @@ def test_xylogspace(setup_mpl):
 
     plt.xscale("log")
     plt.yscale("log")
-    plt.xlim(min(x), max(x))  # Needed to avoid approximation overshoot leading to x min = 0.01
+    plt.xlim(0.1, 1e1)  # Needed to avoid approximation overshoot on x lims
+    plt.ylim(1e-5, 1e5)  # Needed to avoid approximation overshoot on y lims
 
     add_inline_labels(plt.gca())
     plt.xlabel("$x$")
