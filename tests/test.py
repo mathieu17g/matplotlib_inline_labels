@@ -107,11 +107,10 @@ def test_xylogspace(setup_mpl):
     for k in K:
         plt.plot(x, np.power(x, k), label=rf"$f(x)=x^{{{k}}}$")
 
-    plt.xlim(min(x), max(x)) # Needed to avoid approximation overshoot leading to x min = 0.01
     plt.xscale("log")
     plt.yscale("log")
+    plt.xlim(min(x), max(x))  # Needed to avoid approximation overshoot leading to x min = 0.01
 
-    # We fix the xvals to prevent out-of-range
     add_inline_labels(plt.gca())
     plt.xlabel("$x$")
     plt.ylabel("$f(x)$")
