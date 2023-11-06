@@ -363,7 +363,7 @@ def test_labeling_axhline(setup_mpl):
 _ = test_labeling_axhline(setup_mpl)
 
 # %% 
-@pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
+@pytest.mark.mpl_image_compare(style="default", savefig_kwargs={"bbox_inches": "tight"})
 def test_unplaced_labels(setup_mpl):
     X = np.linspace(0, 1, 500)
     A = [1, 2, 5, 10, 20]
