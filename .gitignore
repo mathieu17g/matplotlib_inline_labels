@@ -1,7 +1,8 @@
 local_examples/
 __pycache__/
 .pytest_cache/
+tests/local_results/
+tests/local_baseline/
 .vscode/
 coverage.xml
 .coverage
-tests/results

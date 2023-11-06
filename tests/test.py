@@ -18,8 +18,6 @@ def setup_mpl():
     setup()
     plt.clf()
 
-#! savefig_kwargs={"bbox_inches": "tight"} is necessary to properly save visual debug image
-
 
 # %%
 @pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
@@ -48,6 +46,7 @@ def test_linspace_with_visualdebug(setup_mpl):
     for k in K:
         plt.plot(x, np.sin(k * x), label=rf"$f(x)=\sin({k} x)$")
 
+    #! savefig_kwargs={"bbox_inches": "tight"} is necessary to properly save visual debug image
     add_inline_labels(plt.gca(), debug=True, fig_for_debug=plt.gcf())
     plt.xlabel("$x$")
     plt.ylabel("$f(x)$")
@@ -102,7 +101,8 @@ _ = test_xlogspace(setup_mpl)
 # @pytest.mark.xfail(sys.platform.startswith('linux'), reason="pytest-mpl does not yield same figure between test and baseline generation on Linux")
 @pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
 def test_xylogspace(setup_mpl):
-    plt.subplots(figsize=(6.4, 4.8)) # Necessary on linux, otherwise baseline generated image different from test output image
+    #! Necessary to specify a figsize on linux, otherwise baseline generated image different from test output image
+    plt.subplots(figsize=(6.4, 4.8))
     x = np.geomspace(0.1, 1e1)
     K = np.arange(-5, 5, 2)
 
@@ -363,16 +363,34 @@ def test_labeling_axhline(setup_mpl):
 
 _ = test_labeling_axhline(setup_mpl)
 
-# %% 
+
+# %%
 @pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
 def test_unplaced_labels(setup_mpl):
-    plt.subplots(figsize=(6.4, 4.8)) # Necessary on linux, otherwise baseline generated image different from test output image
+    #! Necessary to specify a figsize on linux, otherwise baseline generated image different from test output image
+    plt.subplots(figsize=(6.4, 4.8))
     X = np.linspace(0, 1, 500)
     A = [1, 2, 5, 10, 20]
     for a in A:
         plt.plot(X, loglaplace(4).pdf(a * X), label=f"Line {a}")
     add_inline_labels(plt.gca(), fontsize="x-large")
     return plt.gcf()
+
+
+_ = test_unplaced_labels(setup_mpl)
+# %%
+@pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
+def test_unplaced_labels(setup_mpl):
+    #! Necessary to specify a figsize on linux, otherwise baseline generated image different from test output image
+    plt.subplots(figsize=(6.4, 4.8))
+    X = np.linspace(0, 1, 500)
+    A = [1, 2, 5, 10, 20]
+    for a in A:
+        plt.plot(X, loglaplace(4).pdf(a * X), label=f"Line {a}")
+    with pytest.warns(UserWarning):
+        add_inline_labels(plt.gca(), fontsize="x-large", nowarn=False)
+    return plt.gcf()
+
 
 _ = test_unplaced_labels(setup_mpl)
 # %%
