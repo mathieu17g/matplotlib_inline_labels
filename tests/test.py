@@ -9,6 +9,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
 from inline_labels import add_inline_labels
 from datetime import datetime
 from matplotlib.dates import UTC, DateFormatter, DayLocator
+from scipy.stats import loglaplace
 
 
 # %%
@@ -360,3 +361,16 @@ def test_labeling_axhline(setup_mpl):
 
 
 _ = test_labeling_axhline(setup_mpl)
+
+# %% 
+@pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
+def test_unplaced_labels(setup_mpl):
+    X = np.linspace(0, 1, 500)
+    A = [1, 2, 5, 10, 20]
+    for a in A:
+        plt.plot(X, loglaplace(4).pdf(a * X), label=f"Line {a}")
+    add_inline_labels(plt.gca(), fontsize="x-large")
+    return plt.gcf()
+
+_ = test_unplaced_labels(setup_mpl)
+# %%

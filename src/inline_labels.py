@@ -1219,11 +1219,13 @@ def add_inline_labels(
             ax_data.legend(
                 handles=[data_linelikeHandles[data_linelikeLabels.index(l)] for l in legend_labels],
                 labels=legend_labels,
+                **l_text_kwarg,
             )
         ax.legend(
             handles=[linelikeHandles[linelikeLabels.index(l)] for l in legend_labels],
             labels=legend_labels,
             facecolor=ax.get_facecolor(),
+            **l_text_kwarg,
         )
 
     if debug:

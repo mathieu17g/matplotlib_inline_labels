@@ -1,6 +1,6 @@
 matplotlib
 nptyping
 numpy
-# scipy>=1.11.3
+scipy
 Shapely
 tqdm
