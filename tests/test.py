@@ -2,6 +2,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
+from matplotlib.testing import setup
 import os, sys
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
@@ -14,6 +15,7 @@ from scipy.stats import loglaplace
 # %%
 @pytest.fixture()
 def setup_mpl():
+    setup()
     plt.clf()
 
 #! savefig_kwargs={"bbox_inches": "tight"} is necessary to properly save visual debug image
