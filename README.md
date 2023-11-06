@@ -1,3 +1,5 @@
+[![codecov](https://codecov.io/gh/mathieu17g/matplotlib_inline_labels/graph/badge.svg?token=U87DA7BVCZ)](https://codecov.io/gh/mathieu17g/matplotlib_inline_labels)
+
 # matplotlib_inline_labels
 
 
