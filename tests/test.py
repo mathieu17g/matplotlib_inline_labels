@@ -10,6 +10,7 @@ from inline_labels import add_inline_labels
 from datetime import datetime
 from matplotlib.dates import UTC, DateFormatter, DayLocator
 from scipy.stats import loglaplace
+from warnings import catch_warnings
 
 
 # %%
@@ -366,21 +367,22 @@ _ = test_labeling_axhline(setup_mpl)
 
 # %%
 @pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
-def test_unplaced_labels(setup_mpl):
+def test_unplaced_labels_without_warning(setup_mpl):
     #! Necessary to specify a figsize on linux, otherwise baseline generated image different from test output image
     plt.subplots(figsize=(6.4, 4.8))
     X = np.linspace(0, 1, 500)
     A = [1, 2, 5, 10, 20]
     for a in A:
         plt.plot(X, loglaplace(4).pdf(a * X), label=f"Line {a}")
-    add_inline_labels(plt.gca(), fontsize="x-large")
+    with catch_warnings():
+        add_inline_labels(plt.gca(), fontsize="x-large")
     return plt.gcf()
 
 
-_ = test_unplaced_labels(setup_mpl)
+_ = test_unplaced_labels_without_warning(setup_mpl)
 # %%
 @pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
-def test_unplaced_labels(setup_mpl):
+def test_unplaced_labels_with_warning(setup_mpl):
     #! Necessary to specify a figsize on linux, otherwise baseline generated image different from test output image
     plt.subplots(figsize=(6.4, 4.8))
     X = np.linspace(0, 1, 500)
@@ -392,5 +394,33 @@ def test_unplaced_labels(setup_mpl):
     return plt.gcf()
 
 
-_ = test_unplaced_labels(setup_mpl)
+_ = test_unplaced_labels_with_warning(setup_mpl)
+# %%
+@pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
+def test_multiple_labels_with_overall_progress(setup_mpl):
+    #! Necessary to specify a figsize on linux, otherwise baseline generated image different from test output image
+    plt.subplots(figsize=(6.4, 4.8))
+    X = np.linspace(0, 1, 500)
+    A = [1, 2, 5, 10, 20]
+    for a in A:
+        plt.plot(X, loglaplace(4).pdf(a * X), label=f"Line {a}")
+    add_inline_labels(plt.gca(), fontsize="medium", with_overall_progress=True)
+    return plt.gcf()
+
+
+_ = test_multiple_labels_with_overall_progress(setup_mpl)
+# %%
+@pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
+def test_multiple_labels_with_perlabel_progress(setup_mpl):
+    #! Necessary to specify a figsize on linux, otherwise baseline generated image different from test output image
+    plt.subplots(figsize=(6.4, 4.8))
+    X = np.linspace(0, 1, 500)
+    A = [1, 2, 5, 10, 20]
+    for a in A:
+        plt.plot(X, loglaplace(4).pdf(a * X), label=f"Line {a}")
+    add_inline_labels(plt.gca(), fontsize="medium", with_perlabel_progress=True)
+    return plt.gcf()
+
+
+_ = test_multiple_labels_with_perlabel_progress(setup_mpl)
 # %%
