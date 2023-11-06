@@ -2,7 +2,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
-from matplotlib.testing import setup
 import os, sys
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
@@ -15,7 +14,6 @@ from scipy.stats import loglaplace
 # %%
 @pytest.fixture()
 def setup_mpl():
-    setup()
     plt.clf()
 
 #! savefig_kwargs={"bbox_inches": "tight"} is necessary to properly save visual debug image
@@ -99,9 +97,10 @@ _ = test_xlogspace(setup_mpl)
 
 
 # %%
-@pytest.mark.xfail(sys.platform.startswith('linux'), reason="pytest-mpl does not yield same figure between test and baseline generation on Linux")
+# @pytest.mark.xfail(sys.platform.startswith('linux'), reason="pytest-mpl does not yield same figure between test and baseline generation on Linux")
 @pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
 def test_xylogspace(setup_mpl):
+    plt.subplots(figsize=(6.4, 4.8)) # Necessary on linux, otherwise baseline generated image different from test output image
     x = np.geomspace(0.1, 1e1)
     K = np.arange(-5, 5, 2)
 
@@ -365,7 +364,7 @@ _ = test_labeling_axhline(setup_mpl)
 # %% 
 @pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
 def test_unplaced_labels(setup_mpl):
-    plt.subplots(figsize=(6.4, 4.8))
+    plt.subplots(figsize=(6.4, 4.8)) # Necessary on linux, otherwise baseline generated image different from test output image
     X = np.linspace(0, 1, 500)
     A = [1, 2, 5, 10, 20]
     for a in A:
