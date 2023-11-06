@@ -17,7 +17,6 @@ def setup_mpl():
     setup()
     plt.clf()
 
-
 #! savefig_kwargs={"bbox_inches": "tight"} is necessary to properly save visual debug image
 
 
@@ -99,7 +98,8 @@ _ = test_xlogspace(setup_mpl)
 
 
 # %%
-@pytest.mark.mpl_image_compare(savefig_kwargs={})#"bbox_inches": "tight"})
+@pytest.mark.skipif(sys.platform.startswith('linux'), reason="pytest-mpl does not yield same figure between test and baseline generation on Linux")
+@pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
 def test_xylogspace(setup_mpl):
     x = np.geomspace(0.1, 1e1)
     K = np.arange(-5, 5, 2)
