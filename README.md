@@ -1,5 +1,5 @@
 [![codecov](https://codecov.io/gh/mathieu17g/matplotlib_inline_labels/graph/badge.svg?token=U87DA7BVCZ)](https://codecov.io/gh/mathieu17g/matplotlib_inline_labels)
-![Tests](https://github.com/github/docs/actions/workflows/pytest.yml/badge.svg)
+![Tests](https://github.com/mathieu17g/matplotlib_inline_labels/actions/workflows/pytest.yml/badge.svg)
 
 # matplotlib_inline_labels
 
