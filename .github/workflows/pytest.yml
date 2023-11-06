@@ -36,10 +36,9 @@ jobs:
         - name: Windows - create test results and baseline directories
           if: ${{ matrix.os == 'windows-latest'}}
           run: |
-            if not exist tests/pytest_mpl_results_${{ matrix.os }}_${{ matrix.python }} mkdir tests/pytest_mpl_results_${{ matrix.os }}_${{ matrix.python }}
-            if not exist tests/pytest_mpl_baseline_${{ matrix.os }}_${{ matrix.python }} mkdir tests/pytest_mpl_baseline_${{ matrix.os }}_${{ matrix.python }}
-            if not exist mpl_new_baseline_${{ matrix.os }}_${{ matrix.python }} mkdir tests/pytest_mpl_new_baseline_${{ matrix.os }}_${{ matrix.python }}
-          shell: cmd
+            New-Item -Path tests/pytest_mpl_results_${{ matrix.os }}_${{ matrix.python }} -ItemType Directory -Force
+            New-Item -Path tests/pytest_mpl_baseline_${{ matrix.os }}_${{ matrix.python }} -ItemType Directory -Force
+            New-Item -Path tests/mpl_new_baseline_${{ matrix.os }}_${{ matrix.python }} -ItemType Directory -Force
 
         - name: Non windows - create test results and baseline directories
           if: ${{ matrix.os != 'windows-latest'}}
