@@ -821,16 +821,18 @@ def add_inline_labels(
     when viewed on a real image or by increasing the dpi.
 
     ### Args:
-        - `ax` (`Axes`): Axe composed of Line2D objects, with a datetime.datetime x-axis
-        - `ppf` (`float`): position precision factor, fraction of the label box height, itself depending on the font properties
-        - `with_overall_progress` (`bool`): one progress bar for whole axe
-        - `with_perlabel_progress` (`bool`): on progress bar per line
+        - `ax` (`Axes`): Axe composed of Line2D objects
+        - `ppf` (`float`): position precision factor, fraction of the label box height, itself depending on the font properties. 
+          This fraction of the label's box height is used as a sampling distance along the line chunk to define candidates for label's bounding box's center positionning
+        - `with_overall_progress` (`bool`): progress bar for whole axe's labels positionning
+        - `with_perlabel_progress` (`bool`): progress bar per label positionning
         - `nowarn` (`bool`): no warning for unplaced labels
         - `debug` (`bool`): draws a figure showing the algorithm intermediate results
         - `fig_for_debug` (`Figure` | `None`): matplotlib figure for debugging view
+        - `**l_text_kwargs`: text kwargs used for label drawing
 
     ### Returns:
-        `List[datetime]`: labels positions as x-axis values
+        The figure of the input Axe with labels drawn inline on the input Axe
     """
 
     # Draw the figure before anything else
