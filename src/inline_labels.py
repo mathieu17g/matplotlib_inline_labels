@@ -822,7 +822,7 @@ def add_inline_labels(
 
     ### Args:
         - `ax` (`Axes`): Axe composed of Line2D objects
-        - `ppf` (`float`): position precision factor, fraction of the label box height, itself depending on the font properties. 
+        - `ppf` (`float`): position precision factor, fraction of the label box height, itself depending on the font properties.
           This fraction of the label's box height is used as a sampling distance along the line chunk to define candidates for label's bounding box's center positionning
         - `with_overall_progress` (`bool`): progress bar for whole axe's labels positionning
         - `with_perlabel_progress` (`bool`): progress bar per label positionning
