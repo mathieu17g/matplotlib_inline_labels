@@ -19,11 +19,11 @@ classifiers = [
     "Development Status :: 3 - Alpha",
 ]
 dependencies = [
-  matplotlib,
-  nptyping,
-  numpy,
-  Shapely,
-  tqdm,
+  "matplotlib",
+  "nptyping",
+  "numpy",
+  "Shapely",
+  "tqdm",
 ]
 
 [project.urls]
@@ -32,10 +32,10 @@ dependencies = [
 
 [project.optional.dependencies]
 test = [
-  pytest,
-  pytest-cov,
-  pytest-mpl,
-  scipy,
+  "pytest",
+  "pytest-cov",
+  "pytest-mpl",
+  "scipy",
 ]
 
 [tool.flit.module]
