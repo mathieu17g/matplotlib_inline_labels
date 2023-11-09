@@ -18,6 +18,7 @@ classifiers = [
     "Operating System :: OS Independent",
     "Development Status :: 3 - Alpha",
 ]
+
 dependencies = [
   "matplotlib",
   "nptyping",
@@ -26,10 +27,6 @@ dependencies = [
   "tqdm",
 ]
 
-[project.urls]
-"Homepage" = "https://github.com/mathieu17g/matplotlib_inline_labels"
-"Bug Tracker" = "https://github.com/mathieu17g/matplotlib_inline_labels/issues"
-
 [project.optional.dependencies]
 test = [
   "pytest",
@@ -37,6 +34,10 @@ test = [
   "pytest-mpl",
   "scipy",
 ]
+
+[project.urls]
+"Homepage" = "https://github.com/mathieu17g/matplotlib_inline_labels"
+"Bug Tracker" = "https://github.com/mathieu17g/matplotlib_inline_labels/issues"
 
 [tool.flit.module]
 name = "inlinelabels"
