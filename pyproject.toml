@@ -39,9 +39,6 @@ test = [
 "Homepage" = "https://github.com/mathieu17g/matplotlib_inline_labels"
 "Bug Tracker" = "https://github.com/mathieu17g/matplotlib_inline_labels/issues"
 
-[tool.flit.module]
-name = "inlinelabels"
-
 [tool.black]
 line-length = 125
 
