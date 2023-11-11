@@ -4,5 +4,6 @@ __pycache__/
 tests/local_results/
 tests/local_baseline/
 .vscode/
+dist/
 coverage.xml
 .coverage

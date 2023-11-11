@@ -16,14 +16,12 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: "3.x"
-    - name: Install pypa/build
+    - name: Install pypa/flit
       run: >-
-        python3 -m
-        pip install
-        build
-        --user
+        python3 -m pip install --upgrade pip
+        pip install flit
     - name: Build a binary wheel and a source tarball
-      run: python3 -m build
+      run: flit build
     - name: Store the distribution packages
       uses: actions/upload-artifact@v3
       with:
