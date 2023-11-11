@@ -41,7 +41,7 @@ add_inline_labels(axes[5], with_overall_progress=True, fontsize="small")
 
 fig.show()
 ```
-![Example](examples/example.png)
+![Example](example.png)
 
 If something goes wrong, a visual debug is available:
 
@@ -55,7 +55,7 @@ fig_debug = add_inline_labels(ax, ppf=0.5, with_perlabel_progress=True, debug=Tr
 
 fig_debug.show()
 ```
-![Visual debug example](examples/example_debug.png)
+![Visual debug example](example_debug.png)
 
 # TODO
 - [X] Make it work for line with error bars
