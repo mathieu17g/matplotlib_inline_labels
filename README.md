@@ -41,7 +41,7 @@ add_inline_labels(axes[5], with_overall_progress=True, fontsize="small")
 
 fig.show()
 ```
-![Example](example.png)
+![Example](https://github.com/mathieu17g/matplotlib_inline_labels/blob/main/examples/example.png)
 
 If something goes wrong, a visual debug is available:
 
@@ -55,7 +55,7 @@ fig_debug = add_inline_labels(ax, ppf=0.5, with_perlabel_progress=True, debug=Tr
 
 fig_debug.show()
 ```
-![Visual debug example](example_debug.png)
+![Visual debug example](https://github.com/mathieu17g/matplotlib_inline_labels/blob/main/examples/example_debug.png)
 
 # TODO
 - [X] Make it work for line with error bars
