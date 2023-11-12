@@ -1,6 +1,0 @@
-matplotlib
-nptyping
-numpy
-scipy
-Shapely
-tqdm
