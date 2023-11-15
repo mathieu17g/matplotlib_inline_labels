@@ -8,12 +8,17 @@ This package is inspired by [matplotlib-label-lines](https://github.com/cphyc/ma
 
 It adds automatic label positioning by preventing label bounding boxes from overlapping other lines and each other.
 
+## Install
+
+Just do:
+```bash
+pip install matplotlib-inline-labels
+```
+
 ```python
 import numpy as np
 from matplotlib import pyplot as plt
 from scipy.stats import chi2, loglaplace
-import sys
-sys.path.append("../src/")
 from inline_labels import add_inline_labels
 
 X = np.linspace(0, 1, 500)
