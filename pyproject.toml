@@ -46,6 +46,9 @@ include = ["src"]
 [tool.black]
 line-length = 125
 
+[tool.ruff]
+line-length = 125
+
 [tool.coverage.run]
 branch = true
 
