@@ -15,6 +15,8 @@ Just do:
 pip install matplotlib-inline-labels
 ```
 
+## Example
+
 ```python
 import numpy as np
 from matplotlib import pyplot as plt
@@ -48,7 +50,9 @@ fig.show()
 ```
 ![Example](https://raw.githubusercontent.com/mathieu17g/matplotlib_inline_labels/main/examples/example.png)
 
-If something goes wrong, a visual debug is available:
+## Visual debug
+
+If something goes wrong or the automatic placement could be enhanced, a visual debug is available:
 
 ```python
 fig, ax = plt.subplots()
