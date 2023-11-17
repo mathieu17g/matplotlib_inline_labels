@@ -2,9 +2,9 @@ name: Test package
 
 on:
     push:
-        branches: [main]
+        branches: [main, develop]
     pull_request:
-        branches: [main]
+        branches: [main, develop]
     workflow_dispatch: # Allows to run workflow manually from the Actions tab
     schedule:
         # Saunch workflow at 5:19 AM everyday

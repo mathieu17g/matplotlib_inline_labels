@@ -1166,7 +1166,7 @@ def add_inline_labels(
                 trans_geom2data = get_geom2disp_trans(ax) + ax.transData.inverted()
                 l_x, l_y = trans_geom2data.transform((bpc["c_geom"].x, bpc["c_geom"].y))
                 # Plot labels on ax
-                label = ax.text(
+                labelText = ax.text(
                     l_x,
                     l_y,
                     label,
@@ -1178,7 +1178,7 @@ def add_inline_labels(
                     bbox=dict(boxstyle="square, pad=0.3", mutation_aspect=1 / 10, fc=ax.get_facecolor(), lw=0),
                     **l_text_kwarg,
                 )
-                fprop = label.get_fontproperties()
+                fprop = labelText.get_fontproperties()
                 if debug:  # Plot labels' boxes on ax_data and chosen labels' centers on ax_geoms
                     ax_data.text(
                         l_x,
