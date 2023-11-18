@@ -2,9 +2,7 @@ name: Test package
 
 on:
     push:
-        branches: [main]
-    pull_request:
-        branches: [main]
+        branches: [main, develop]
     workflow_dispatch: # Allows to run workflow manually from the Actions tab
     schedule:
         # Saunch workflow at 5:19 AM everyday
@@ -50,22 +48,14 @@ jobs:
         - name: Test with pytest
           run: >
             pytest 
-            --color=yes 
-            --mpl 
             --mpl-results-path=tests/pytest_mpl_results_${{ matrix.os }}_${{ matrix.python }}
             --mpl-baseline-path=tests/pytest_mpl_baseline_${{ matrix.os }}_${{ matrix.python }} 
             --mpl-generate-summary=html 
-            --cov=src 
-            --cov-report=xml 
-            --cov-fail-under=85 
-            -rxXs
 
         - name: Generate new image baseline
           if: failure()
           run: >
             pytest 
-            --color=yes 
-            --mpl 
             --mpl-generate-path=tests/pytest_mpl_new_baseline_${{ matrix.os }}_${{ matrix.python }} 
             --last-failed
 

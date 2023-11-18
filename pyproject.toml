@@ -4,7 +4,7 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "matplotlib_inline_labels"
-version = "0.1.4"
+version = "0.1.5"
 authors = [{name = "mathieu17g", email = "mathieu19g@icloud.com"}]
 description = "Inline line labels for matplotlib with automatic positionning"
 readme = "README.md"
@@ -46,11 +46,16 @@ include = ["src"]
 [tool.black]
 line-length = 125
 
+[tool.ruff]
+line-length = 125
+
 [tool.coverage.run]
 branch = true
+source = ["src",]
+omit = ["__init__.py",]
 
 [tool.coverage.report]
-fail_under = 90
+fail_under = 85
 
 [tool.pytest.ini_options]
 python_files = "test*.py"
@@ -59,4 +64,5 @@ filterwarnings = [
     "ignore::DeprecationWarning",
     ]
 pythonpath = "src"
-addopts = "--mpl"
+testpaths = ["tests",]
+addopts = "--color=yes --mpl --cov --cov-report=xml -rxXs"

@@ -9,19 +9,27 @@ from matplotlib.transforms import Transform, Affine2D
 from mpl_toolkits.axes_grid1 import Divider, Size
 from typing import Any, Tuple, Literal, Union, Callable, Optional, TypedDict
 from nptyping import NDArray, Shape, Float, Object
-from datetime import datetime as dt
-from matplotlib.dates import date2num, DateConverter
+
+# from datetime import datetime as dt
+from matplotlib.dates import date2num  # , DateConverter
 import numpy as np
 from numpy import ma
-from numpy import linalg as LA
+
+# from numpy import linalg as LA
 from functools import lru_cache
 import warnings
 import shapely as shp
 from collections import namedtuple
-from functools import lru_cache
 from tqdm.auto import tqdm
 import math
 from contextlib import nullcontext
+from operator import sub
+
+#! DEBUG IMPORTS
+import functools
+import time
+
+#! END OF DEBUG IMPORTS
 
 plt.close("all")
 
@@ -89,22 +97,20 @@ MLS_LCR_Candidates = dict[  # Multi level seperation label center and rotation c
 ### HELPER FUNCTIONS FOR LABEL POSITIONING ###
 ###############################################
 
-from operator import sub
-
 
 def retrieve_lines_and_labels(ax: Axes) -> tuple[list[Line2D], list[str]]:
     """Retrieves line-like objects from an Axes and the corresponding labels"""
     linelikeHandles, linelikeLabels = [], []
     allHandles, allLabels = ax.get_legend_handles_labels()
-    for h, l in zip(allHandles, allLabels):
-        if isinstance(h, ErrorbarContainer):
-            line = h.lines[0]
-        elif isinstance(h, Line2D):
-            line = h
+    for handle, label in zip(allHandles, allLabels):
+        if isinstance(handle, ErrorbarContainer):
+            line = handle.lines[0]
+        elif isinstance(handle, Line2D):
+            line = handle
         else:
             continue
         linelikeHandles.append(line)
-        linelikeLabels.append(l)
+        linelikeLabels.append(label)
     return linelikeHandles, linelikeLabels
 
 
@@ -162,8 +168,8 @@ def get_dbg_axes(ax: Axes, fig_for_debug: Figure) -> Tuple[Axes, Axes]:
     )
 
     for _, sub_ax in enumerate([ax_data, ax_geoms]):
-        for l in retrieve_lines_and_labels(ax)[0]:
-            sub_ax.plot(*(l.get_data()), linewidth=l.get_linewidth(), label=l.get_label())
+        for line in retrieve_lines_and_labels(ax)[0]:
+            sub_ax.plot(*(line.get_data()), linewidth=line.get_linewidth(), label=line.get_label())
         # Rotate x-axis labels manually since autofmt_xdate does not work for multiple axes which are not separated into subplots,
         # Solution found at https://stackoverflow.com/questions/48078540/matplotlib-autofmt-xdate-fails-to-rotate-x-axis-labels-after-axes-cla-is-c
         for label in sub_ax.get_xticklabels():
@@ -214,12 +220,12 @@ def get_axe_lines_widths(ax: Axes, linelikeHandles, linelikeLabels) -> dict[str,
     # -> showing differences betwen points and pixels
     # - sdau answer at https://stackoverflow.com/questions/16649970/custom-markers-with-screen-coordinate-size-in-older-matplotlib
     # -> showing the function points_to_pixels to convert points into pixels
-    for l in linelikeLabels:
-        h = linelikeHandles[linelikeLabels.index(l)]
+    for label in linelikeLabels:
+        h = linelikeHandles[linelikeLabels.index(label)]
         lw_pts = h.get_linewidth()
         lw_display = ax.get_figure().canvas.get_renderer().points_to_pixels(lw_pts)
         lw_geoms = (1 / ax.get_window_extent().width) * lw_display
-        ld_lw.setdefault(l, lw_geoms)
+        ld_lw.setdefault(label, lw_geoms)
     return ld_lw
 
 
@@ -232,12 +238,12 @@ def get_axe_lines_geometries(
     Returns :
     `{<label>: {'lcd': {<line chunk index>: {'lc': <line chunk, 'lcb': <buffered line chunk>}}}}`
     """
-    ld = {l: {} for l in linelikeLabels}
+    ld = {label: {} for label in linelikeLabels}
     trans_data2geom = ax.transData + get_disp2geom_trans(ax)
-    for l in linelikeLabels:
-        h = linelikeHandles[linelikeLabels.index(l)]
+    for label in linelikeLabels:
+        h = linelikeHandles[linelikeLabels.index(label)]
         # Initialize current label's line chunk dictionary
-        ld[l].setdefault("lcd", {})
+        ld[label].setdefault("lcd", {})
         # Get the x and y data from Line2D object
         l_xdata_raw, l_ydata_raw = h.get_data(orig=False)
         # Check that x and y data are either of type float or datetime64.
@@ -248,14 +254,14 @@ def get_axe_lines_geometries(
         elif l_xdata_raw.dtype == np.dtype("float64"):
             l_xdata_f = l_xdata_raw
         else:
-            raise ValueError(f"Line label: {l} has x data neither of type float or date, which is not handle for now")
+            raise ValueError(f"Line label: {label} has x data neither of type float or date, which is not handle for now")
         if l_ydata_raw.dtype == np.datetime64:
             # Convert y data from date_time to float
             l_ydata_f = date2num(l_ydata_raw)
         elif l_ydata_raw.dtype == np.dtype("float64"):
             l_ydata_f = l_ydata_raw
         else:
-            raise ValueError(f"Line label: {l} has y data neither of type float or date, which is not handle for now")
+            raise ValueError(f"Line label: {label} has y data neither of type float or date, which is not handle for now")
         # Convert from Data coordinates to Axes coordinates
         l_xydata_geom_coords = ma.masked_invalid(trans_data2geom.transform(np.c_[l_xdata_f, l_ydata_f]))
         # Axe ax_geoms box in geometry coordinates, in a shape compatible with shapely.clip_by_rect function
@@ -263,7 +269,7 @@ def get_axe_lines_geometries(
         shp.prepare(axe_box)
         if (seqlen := len(ma.clump_unmasked(l_xydata_geom_coords[:, 1]))) > 1:
             if not nowarn:
-                print(f"Line {l} of Axe {ax.get_title()} is splitted in {seqlen} continuous chunks")
+                print(f"Line {label} of Axe {ax.get_title()} is splitted in {seqlen} continuous chunks")
         i = 0
         for s in ma.clump_unmasked(l_xydata_geom_coords[:, 1]):
             if s.stop - s.start == 1:
@@ -274,19 +280,19 @@ def get_axe_lines_geometries(
                 if shp.get_num_geometries(lc) > 1:
                     for lc_piece in lc.geoms:
                         shp.prepare(lc_piece)
-                        lc_pieceb = shp.buffer(lc_piece, ld_lw[l] / 2)
+                        lc_pieceb = shp.buffer(lc_piece, ld_lw[label] / 2)
                         shp.prepare(lc_pieceb)
-                        ld[l]["lcd"].setdefault(i, {"lc": lc_piece, "lcb": lc_pieceb})
-                        ld[l]["lcd"][i].setdefault("lcp", lc_piece)
-                        ld[l]["lcd"][i].setdefault("lcbp", lc_pieceb)
+                        ld[label]["lcd"].setdefault(i, {"lc": lc_piece, "lcb": lc_pieceb})
+                        ld[label]["lcd"][i].setdefault("lcp", lc_piece)
+                        ld[label]["lcd"][i].setdefault("lcbp", lc_pieceb)
                         i += 1
                 else:
                     shp.prepare(lc)
-                    lcb = shp.buffer(lc, ld_lw[l] / 2)
+                    lcb = shp.buffer(lc, ld_lw[label] / 2)
                     shp.prepare(lcb)
-                    ld[l]["lcd"].setdefault(i, {"lc": lc, "lcb": lcb})
-                    ld[l]["lcd"][i].setdefault("lcp", lc)
-                    ld[l]["lcd"][i].setdefault("lcbp", lcb)
+                    ld[label]["lcd"].setdefault(i, {"lc": lc, "lcb": lcb})
+                    ld[label]["lcd"][i].setdefault("lcp", lc)
+                    ld[label]["lcd"][i].setdefault("lcbp", lcb)
                     i += 1
     return ld
 
@@ -297,11 +303,11 @@ def plot_geometric_line_chunks(ax_geoms: Axes, ld: Plot_Labels_Geom_Data):
     for line in ax_geoms.get_lines():
         line.remove()
     # Plot all the line chunks for all labels
-    for l in list(ld):
-        for lc_idx in list(ld[l]["lcd"]):
+    for label in list(ld):
+        for lc_idx in list(ld[label]["lcd"]):
             dbg_line_color = ax_geoms.plot(
-                *(shp.get_coordinates(ld[l]["lcd"][lc_idx]["lc"]).T),
-                label=(l + f" - chunk #{lc_idx}"),
+                *(shp.get_coordinates(ld[label]["lcd"][lc_idx]["lc"]).T),
+                label=(label + f" - chunk #{lc_idx}"),
                 transform=get_geom2disp_trans(ax_geoms),
                 clip_on=False,
                 linewidth=0.5,
@@ -310,9 +316,9 @@ def plot_geometric_line_chunks(ax_geoms: Axes, ld: Plot_Labels_Geom_Data):
             )
             # Add the outline of the original line using the buffered version of the line chunk
             ax_geoms.plot(
-                *(shp.get_coordinates(shp.boundary(ld[l]["lcd"][lc_idx]["lcb"])).T),
+                *(shp.get_coordinates(shp.boundary(ld[label]["lcd"][lc_idx]["lcb"])).T),
                 label=(
-                    "_" + l + f" - buffered chunk #{lc_idx}"
+                    "_" + label + f" - buffered chunk #{lc_idx}"
                 ),  # Adding a leading underscore prevent the artist to be included in automatic legend
                 color=dbg_line_color[0].get_color(),
                 transform=get_geom2disp_trans(ax_geoms),
@@ -325,7 +331,7 @@ def plot_geometric_line_chunks(ax_geoms: Axes, ld: Plot_Labels_Geom_Data):
 
 
 def update_ld_with_label_text_box_dimensions(
-    ax, linelikeHandles, linelikeLabels, ld, l, **l_text_kwarg
+    ax, linelikeHandles, linelikeLabels, ld, label, **label_text_kwarg
 ) -> Tuple[float, float]:
     """Updates line data structure with text label box dimensions
 
@@ -343,15 +349,15 @@ def update_ld_with_label_text_box_dimensions(
     l_text = ax.text(
         0.5,
         0.5,
-        l,
+        label,
         transform=ax.transAxes,
-        color=linelikeHandles[linelikeLabels.index(l)].get_color(),
+        color=linelikeHandles[linelikeLabels.index(label)].get_color(),
         clip_on=False,
         backgroundcolor=ax.get_facecolor(),
         horizontalalignment="center",
         verticalalignment="center",
         bbox=dict(boxstyle="square, pad=0.3", mutation_aspect=1 / 10, fc=ax.get_facecolor(), lw=0),
-        **l_text_kwarg,
+        **label_text_kwarg,
     )
     ax.draw(ax.get_figure().canvas.get_renderer())
     # Retrieve the label's dimensions in display coordinates
@@ -361,7 +367,7 @@ def update_ld_with_label_text_box_dimensions(
     # Calculate width and height in Axes' coordinates
     l_box_w, l_box_h = (l_box_points[1][0] - l_box_points[0][0]), (l_box_points[1][1] - l_box_points[0][1])
     # Add dictionary of label box dimensions
-    ld[l].setdefault("boxd", {"box_w": l_box_w, "box_h": l_box_h})
+    ld[label].setdefault("boxd", {"box_w": l_box_w, "box_h": l_box_h})
     # Delete the label from the plot
     l_text.remove()
     return l_box_w, l_box_h
@@ -378,7 +384,9 @@ def pt_approx_buffer(pt: shp.Geometry, precision: int = 6) -> shp.Geometry:
     return shp.buffer(pt, pt_fp_buffer(pt, precision))
 
 
-def update_ld_with_label_position_candidates(ppf: float, ld: Plot_Labels_Geom_Data, l: str, l_box_w: float, l_box_h: float):
+def update_ld_with_label_position_candidates(
+    ppf: float, ld: Plot_Labels_Geom_Data, label: str, l_box_w: float, l_box_h: float
+):
     """Find all label position (box center) candidates per label's line chunks
     and update ld[l] with its candidate list. Label data structure is updated
     with 'pcl' key in 'lcd' key for label l
@@ -393,15 +401,15 @@ def update_ld_with_label_position_candidates(ppf: float, ld: Plot_Labels_Geom_Da
     # Define a sampling distance unit for the label's box center position on the ligne chunk, equal
     # to a fraction of of the current label's box height
     l_box_cdu = l_box_h * ppf
-    for lc_idx in list(ld[l]["lcd"]):
-        l_lc = ld[l]["lcd"][lc_idx]["lc"]
+    for lc_idx in list(ld[label]["lcd"]):
+        l_lc = ld[label]["lcd"][lc_idx]["lc"]
         if shp.get_type_id(l_lc) == shp.GeometryType.POINT:
-            ld[l]["lcd"][lc_idx].setdefault("pcl", None)
+            ld[label]["lcd"][lc_idx].setdefault("pcl", None)
         # Don't try to put the label on line chunks reduced to a single point
         elif shp.get_type_id(l_lc) != shp.GeometryType.LINESTRING:
             raise ValueError("Geometry collection contains a geometric object which is not either a Point or a LineString")
         elif shp.length(l_lc) <= (l_box_w + l_box_h):
-            ld[l]["lcd"][lc_idx].setdefault(
+            ld[label]["lcd"][lc_idx].setdefault(
                 "pcl", None
             )  # Don't try to put label on line chunks of length inferior to label's box width + height,
         else:
@@ -438,7 +446,7 @@ def update_ld_with_label_position_candidates(ppf: float, ld: Plot_Labels_Geom_Da
                     pt_approx_buffer(shp.line_interpolate_point(l_lc, shp.length(l_lc) - (l_box_h + l_box_w) / 2)),
                 )
             )
-            ld[l]["lcd"][lc_idx].setdefault("pcl", l_lc_bccl)
+            ld[label]["lcd"][lc_idx].setdefault("pcl", l_lc_bccl)
 
 
 # Define number of samples between -(π/2 - ε) to (π/2 - ε), 0 included,
@@ -475,15 +483,15 @@ def get_box_rot_and_trans_function(ev: NDArray[Shape["3,4"], Float]):
     return get_lbox_geom
 
 
-def get_other_line_chunks_buffered_geom(ld: Plot_Labels_Geom_Data, l: str, lc_idx: int) -> NDArray[Any, Object]:
+def get_other_line_chunks_buffered_geom(ld: Plot_Labels_Geom_Data, label: str, lc_idx: int) -> NDArray[Any, Object]:
     """Create the other line chunks set from other labels line chunks and current label other line chunks if any.
     And and make an union geometry for speedup later queries regarding l_box geometry"""
     olcbl = np.array(
         [
-            ld[label]["lcd"][idx]["lcb"]
-            for label in list(ld)
-            for idx in list(ld[label]["lcd"])
-            if (idx != lc_idx) or (label != l)
+            ld[other_label]["lcd"][idx]["lcb"]
+            for other_label in list(ld)
+            for idx in list(ld[other_label]["lcd"])
+            if (idx != lc_idx) or (other_label != label)
         ]
     )
     olcb_geom = olcbl
@@ -496,7 +504,7 @@ def l_box_rotation_check(
     c: Point2D,
     theta: float,
     ld: Plot_Labels_Geom_Data,
-    l: str,
+    label: str,
     lc_idx: int,
     get_lbox_geom: Callable,
 ) -> Tuple[bool, float]:
@@ -506,11 +514,11 @@ def l_box_rotation_check(
     - theta_isvalid (bool): boolean indicating if theta is valid
     - align_err (float): measure of the alignment error between label's box and line chunk
     """
-    l_lc = ld[l]["lcd"][lc_idx]["lc"]
-    l_lcb = ld[l]["lcd"][lc_idx]["lcb"]
-    l_lcp = ld[l]["lcd"][lc_idx]["lcp"]
-    l_lcbp = ld[l]["lcd"][lc_idx]["lcbp"]
-    l_box_h = ld[l]["boxd"]["box_h"]
+    # l_lc = ld[label]["lcd"][lc_idx]["lc"] # TODO: old usage -> find out if can be deleted
+    # l_lcb = ld[label]["lcd"][lc_idx]["lcb"] # TODO: old usage -> find out if can be deleted
+    l_lcp = ld[label]["lcd"][lc_idx]["lcp"]
+    l_lcbp = ld[label]["lcd"][lc_idx]["lcbp"]
+    l_box_h = ld[label]["boxd"]["box_h"]
 
     # Rotate label's box sides and center them on current label position candidate
     rtlbs = get_lbox_geom(type="sides", theta=theta, c=c)
@@ -544,7 +552,7 @@ def rtl_box_intersects_olcl(
     c: Point2D,
     theta: float,
     ld: Plot_Labels_Geom_Data,
-    l: str,
+    label: str,
     lbbfl: list[float],
     olcb_geom: NDArray[Any, Object],
     get_lbox_geom: Callable,
@@ -556,7 +564,7 @@ def rtl_box_intersects_olcl(
     """
     # Create the current label box for x and theta
     rtl_box = get_lbox_geom(type="box", theta=theta, c=c)
-    l_box_h = ld[l]["boxd"]["box_h"]
+    l_box_h = ld[label]["boxd"]["box_h"]
     rtl_buffered_boxes = np.array([shp.buffer(rtl_box, bf * l_box_h) if bf != 0.0 else rtl_box for bf in lbbfl])
     # shp.prepare(rtl_buffered_boxes) #! Boxes preparation slows down the algorithm
     return np.any(
@@ -566,8 +574,6 @@ def rtl_box_intersects_olcl(
 
 
 #! BEGIN DEBUG
-import functools
-import time
 
 
 def timer(func):
@@ -638,7 +644,7 @@ def hlbld_intersections_on_lc_from_lcc(cl: list[Point2D], hw: float, lc: shp.Geo
             )  # ; print(f'{filtered_intersections=}')
         else:
             warnings.warn(
-                f"Label center candidate with less than 2 points on line chunk at a distance of half the label width"
+                "Label center candidate with less than 2 points on line chunk at a distance of half the label width"
             )
             filtered_intersections = shp.multipoints(None)
         intersection_points[idx] = filtered_intersections
@@ -672,7 +678,7 @@ def evaluate_theta(
     theta: float,
     c: Point2D,
     ld: Plot_Labels_Geom_Data,
-    l: str,
+    label: str,
     lc_idx: int,
     lpc_idx: int,
     search_dir: Literal[-1, 1],
@@ -686,7 +692,9 @@ def evaluate_theta(
     # Initialize the new theta search state
     new_tss = tss
     # Check if label rotation is acceptable
-    theta_isvalid, align_err = l_box_rotation_check(c=c, theta=theta, ld=ld, l=l, lc_idx=lc_idx, get_lbox_geom=get_lbox_geom)
+    theta_isvalid, align_err = l_box_rotation_check(
+        c=c, theta=theta, ld=ld, label=label, lc_idx=lc_idx, get_lbox_geom=get_lbox_geom
+    )
     # If theta aligns well the the current line chunk,
     if theta_isvalid:
         # Update the theta search state
@@ -698,7 +706,7 @@ def evaluate_theta(
         l_lc_mls_lpc[-1][lpc_idx]["theta_candidates"].setdefault(theta, align_err)
         # Compute intersects bool array for buffering factors list
         intersects_result = rtl_box_intersects_olcl(
-            c=c, theta=theta, ld=ld, l=l, lbbfl=lbbfl, olcb_geom=olcb_geom, get_lbox_geom=get_lbox_geom
+            c=c, theta=theta, ld=ld, label=label, lbbfl=lbbfl, olcb_geom=olcb_geom, get_lbox_geom=get_lbox_geom
         )
         # Add theta candidate for each buffering factor if the corresponding buffered box
         # does not intersect with other labels line width buffered line chunks
@@ -763,12 +771,12 @@ def filter_best_rotation_angles_per_buffer_size(
 
 
 def plot_label_centers_position_candidates(
-    ax_geoms: Axes, mls_lpc: dict[str, dict[float, list[dict]]], lbbfl: list, l: str
+    ax_geoms: Axes, mls_lpc: dict[str, dict[float, list[dict]]], lbbfl: list, label: str
 ) -> None:
     """Plot label centers position candidates with free space around"""
     bf_colors = {1.0: "tab:green", 0.5: "tab:olive", 0: "tab:orange"}
     for bf in lbbfl:
-        for lpc_list in mls_lpc[l][bf]:
+        for lpc_list in mls_lpc[label][bf]:
             X = [lpc["c_geom"].x for lpc in lpc_list]
             Y = [lpc["c_geom"].y for lpc in lpc_list]
             ax_geoms.plot(
@@ -839,8 +847,8 @@ def add_inline_labels(
     ax.get_figure().canvas.draw_idle()
 
     # Check that the figure belonging to the provided Axe has been passed via fig_for_debug in case debug=True
-    if debug and fig_for_debug == None:
-        raise ValueError(f"`fig_for_debug` has to be provided in case `debug=True`")
+    if debug and fig_for_debug is None:
+        raise ValueError("`fig_for_debug` has to be provided in case `debug=True`")
 
     # Nested progress bar does not work in every case => set overall and per label progress option mutualy exclusive
     if with_overall_progress and with_perlabel_progress:
@@ -907,13 +915,13 @@ def add_inline_labels(
     ########################################################################
     # Identify labels' box geometry and position candidates per line chunk #
     ########################################################################
-    for l in linelikeLabels:
+    for label in linelikeLabels:
         # Get the label text bounding box and x sampling points
         l_box_w, l_box_h = update_ld_with_label_text_box_dimensions(
-            ax, linelikeHandles, linelikeLabels, ld, l, **l_text_kwarg
+            ax, linelikeHandles, linelikeLabels, ld, label, **l_text_kwarg
         )
         # Find all label position (box center) candidates per label's line chunks
-        update_ld_with_label_position_candidates(ppf, ld, l, l_box_w, l_box_h)
+        update_ld_with_label_position_candidates(ppf, ld, label, l_box_w, l_box_h)
 
     ##############################################################
     # Prepare overall progress context maanager if option chosen #
@@ -921,10 +929,10 @@ def add_inline_labels(
     if with_overall_progress:
         overall_candidates_number = sum(
             [
-                len(ld[l]["lcd"][lc_idx]["pcl"])
-                for l in list(ld)
-                for lc_idx in list(ld[l]["lcd"])
-                if ld[l]["lcd"][lc_idx]["pcl"] is not None
+                len(ld[label]["lcd"][lc_idx]["pcl"])
+                for label in list(ld)
+                for lc_idx in list(ld[label]["lcd"])
+                if ld[label]["lcd"][lc_idx]["pcl"] is not None
             ]
         )
         overall_progress_cm = tqdm(
@@ -936,11 +944,11 @@ def add_inline_labels(
     # TODO####################
     # TODO# Vectorize search #
     # TODO####################
-    for l in linelikeLabels:
-        for lc_idx in list(ld[l]["lcd"]):
-            l_pcl = ld[l]["lcd"][lc_idx]["pcl"]
-            l_hw = ld[l]["boxd"]["box_h"]
-            l_lc = ld[l]["lcd"][lc_idx]["lc"]
+    for label in linelikeLabels:
+        for lc_idx in list(ld[label]["lcd"]):
+            l_pcl = ld[label]["lcd"][lc_idx]["pcl"]
+            l_hw = ld[label]["boxd"]["box_h"]
+            l_lc = ld[label]["lcd"][lc_idx]["lc"]
             if l_pcl is not None:
                 hlbld_intersections_on_lc_from_lcc(cl=l_pcl, hw=l_hw, lc=l_lc)
 
@@ -949,15 +957,15 @@ def add_inline_labels(
     #########################
 
     with overall_progress_cm as overall_pbar:
-        for l in linelikeLabels:
+        for label in linelikeLabels:
             ###############################################################################################
             # Create current label's box helper geometries with translation and rotation helper functions #
             ###############################################################################################
 
             # Get the label text bounding box and x sampling points
             # Retrieve half width and half height in Axes' coordinates
-            hw, hh = ld[l]["boxd"]["box_w"] / 2, ld[l]["boxd"]["box_h"] / 2
-            l_box_h = ld[l]["boxd"]["box_h"]
+            hw, hh = ld[label]["boxd"]["box_w"] / 2, ld[label]["boxd"]["box_h"] / 2
+            l_box_h = ld[label]["boxd"]["box_h"]
 
             # Build the label's box vertices array, extended with a one vector for translation computation
             ev = np.array(((-hw, hw, hw, -hw), (hh, hh, -hh, -hh), (1, 1, 1, 1)))
@@ -976,14 +984,14 @@ def add_inline_labels(
             # the distance between the current label box and the other lines + current label line chunks boundaries
 
             # Multi Level Separation Label Position Candidate -> mls_lpc
-            mls_lpc.setdefault(l, {-1: []} | {bf: [] for bf in lbbfl})
+            mls_lpc.setdefault(label, {-1: []} | {bf: [] for bf in lbbfl})
             # If python version < 3.9.x
             # mls_lpc.setdefault(l, {-1: []})
             # for buff_factor in lbbfl: mls_lpc[l].setdefault(buff_factor, [])
 
             # TODO : add an option to parallelize per line chunk computation for line chunck with enough candidates
-            for lc_idx in list(ld[l]["lcd"]):
-                l_pcl = ld[l]["lcd"][lc_idx]["pcl"]
+            for lc_idx in list(ld[label]["lcd"]):
+                l_pcl = ld[label]["lcd"][lc_idx]["pcl"]
                 if l_pcl is not None:
                     #####################################################################
                     # Graph minus current label's line chunk unionned geometry creation #
@@ -991,7 +999,7 @@ def add_inline_labels(
 
                     # Create the other line chunks set from other labels line chunks and current label other line chunks if any.
                     # And and make an union geometry for speedup later queries regarding l_box geometry
-                    olcb_geom = get_other_line_chunks_buffered_geom(ld, l, lc_idx)
+                    olcb_geom = get_other_line_chunks_buffered_geom(ld, label, lc_idx)
 
                     ################################################################################################################
                     # Run through center positions and theta rotations to calculate the three distances from the current label box #
@@ -1033,7 +1041,7 @@ def add_inline_labels(
                                 total=len(l_pcl),
                                 ascii=True,
                                 ncols=80,
-                                desc=f"{l + ' - lc#' + str(lc_idx): <20}",
+                                desc=f"{label + ' - lc#' + str(lc_idx): <20}",
                                 position=1,
                                 leave=False,
                             )
@@ -1042,7 +1050,7 @@ def add_inline_labels(
                                 total=len(l_pcl),
                                 ascii=True,
                                 ncols=80,
-                                desc=f"{l + ' - lc#' + str(lc_idx): <20}",
+                                desc=f"{label + ' - lc#' + str(lc_idx): <20}",
                                 position=0,
                                 leave=True,
                             )
@@ -1089,7 +1097,7 @@ def add_inline_labels(
                                                     search_dir=search_dir,
                                                     tss=tss,
                                                     ld=ld,
-                                                    l=l,
+                                                    label=label,
                                                     lc_idx=lc_idx,
                                                     l_lc_mls_lpc=l_lc_mls_lpc,
                                                     lbbfl=lbbfl,
@@ -1118,7 +1126,7 @@ def add_inline_labels(
                                 perlabel_pbar.update()
 
                     # For each label position candidates dictionary separation level keep only the best theta candidates
-                    l_lc_mls_lcrc = filter_best_rotation_angles_per_buffer_size(l, l_lc_mls_lpc)
+                    l_lc_mls_lcrc = filter_best_rotation_angles_per_buffer_size(label, l_lc_mls_lpc)
 
                     # Append the current label's separation level dictionary the lists of contiguous label box position candidates
                     # found for the current line chunk
@@ -1131,11 +1139,11 @@ def add_inline_labels(
                             [l_lc_mls_lcrc[bf][key] for key in group]
                             for group in np.split(indexes, np.nonzero(np.diff(indexes) > 1)[0] + 1)
                         ]
-                        mls_lpc[l][bf].extend(contiguous_l_lc_mls_lcrc_lists)
+                        mls_lpc[label][bf].extend(contiguous_l_lc_mls_lcrc_lists)
 
                     # Plot position candidate with free space around
                     if debug:
-                        plot_label_centers_position_candidates(ax_geoms, mls_lpc, lbbfl, l)
+                        plot_label_centers_position_candidates(ax_geoms, mls_lpc, lbbfl, label)
 
             # Pick the best position candidate
             # TODO do better than choose only the center of a continous list of center candidates:
@@ -1143,26 +1151,26 @@ def add_inline_labels(
             bsl = None
             # Search for the longest continuous label position candidate list starting from the best separation level to the least
             for bf in lbbfl:
-                if len(mls_lpc[l][bf]) > 1:
-                    bsl = mls_lpc[l][bf][np.argmax([len(continuous_ls_lpc) for continuous_ls_lpc in mls_lpc[l][bf]])]
+                if len(mls_lpc[label][bf]) > 1:
+                    bsl = mls_lpc[label][bf][np.argmax([len(continuous_ls_lpc) for continuous_ls_lpc in mls_lpc[label][bf]])]
                     if len(bsl) > 0:
                         break
-                elif len(mls_lpc[l][bf]) == 1:
-                    bsl = mls_lpc[l][bf][0]
+                elif len(mls_lpc[label][bf]) == 1:
+                    bsl = mls_lpc[label][bf][0]
                     if len(bsl) > 0:
                         break
             if bsl is None or len(bsl) == 0:
-                legend_labels.append(l)
+                legend_labels.append(label)
             else:
                 bpc = bsl[len(bsl) // 2]
                 trans_geom2data = get_geom2disp_trans(ax) + ax.transData.inverted()
                 l_x, l_y = trans_geom2data.transform((bpc["c_geom"].x, bpc["c_geom"].y))
                 # Plot labels on ax
-                label = ax.text(
+                labelText = ax.text(
                     l_x,
                     l_y,
-                    l,
-                    color=linelikeHandles[linelikeLabels.index(l)].get_color(),
+                    label,
+                    color=linelikeHandles[linelikeLabels.index(label)].get_color(),
                     backgroundcolor=ax.get_facecolor(),
                     horizontalalignment="center",
                     verticalalignment="center",
@@ -1170,14 +1178,14 @@ def add_inline_labels(
                     bbox=dict(boxstyle="square, pad=0.3", mutation_aspect=1 / 10, fc=ax.get_facecolor(), lw=0),
                     **l_text_kwarg,
                 )
-                fprop = label.get_fontproperties()
+                fprop = labelText.get_fontproperties()
                 if debug:  # Plot labels' boxes on ax_data and chosen labels' centers on ax_geoms
                     ax_data.text(
                         l_x,
                         l_y,
-                        l,
+                        label,
                         fontproperties=fprop,
-                        color=data_linelikeHandles[data_linelikeLabels.index(l)].get_color(),
+                        color=data_linelikeHandles[data_linelikeLabels.index(label)].get_color(),
                         backgroundcolor=ax_data.get_facecolor(),
                         horizontalalignment="center",
                         verticalalignment="center",
@@ -1186,7 +1194,7 @@ def add_inline_labels(
                             boxstyle="square, pad=0.3",
                             mutation_aspect=1 / 10,
                             fc=ax_data.get_facecolor(),
-                            ec=data_linelikeHandles[data_linelikeLabels.index(l)].get_color(),
+                            ec=data_linelikeHandles[data_linelikeLabels.index(label)].get_color(),
                             lw=0.1,
                         ),
                         **l_text_kwarg,
@@ -1219,12 +1227,12 @@ def add_inline_labels(
         # legend_fs = fs if (not reduced_legend_fs) or ((fs_index := fs_list.index(fs)) == 0) else fs_list[fs_index - 1]
         if debug:
             ax_data.legend(
-                handles=[data_linelikeHandles[data_linelikeLabels.index(l)] for l in legend_labels],
+                handles=[data_linelikeHandles[data_linelikeLabels.index(label)] for label in legend_labels],
                 labels=legend_labels,
                 **l_text_kwarg,
             )
         ax.legend(
-            handles=[linelikeHandles[linelikeLabels.index(l)] for l in legend_labels],
+            handles=[linelikeHandles[linelikeLabels.index(label)] for label in legend_labels],
             labels=legend_labels,
             facecolor=ax.get_facecolor(),
             **l_text_kwarg,
