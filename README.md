@@ -60,7 +60,7 @@ fig, ax = plt.subplots()
 for a in A: 
     ax.semilogx(X, chi2(5).pdf(a * X), label=f"Line {a}")
 ax.set_ylim(top=0.12)
-fig_debug = add_inline_labels(ax, ppf=0.5, with_perlabel_progress=True, debug=True, fig_for_debug=fig)
+fig_debug = add_inline_labels(ax, ppf=1.5, with_perlabel_progress=True, debug=True)
 
 fig_debug.show()
 ```

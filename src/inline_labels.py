@@ -136,9 +136,13 @@ def get_dbg_axes(ax: Axes, fig_for_debug: Figure) -> Tuple[Axes, Axes]:
     ax.get_figure().canvas.draw()
     plt.close("all")
     # Determine original Axes dimensions,
-    # Solution found at https://stackoverflow.com/questions/19306510/determine-matplotlib-axis-size-in-pixels
-    ax_bbox = ax.get_window_extent().transformed(fig_for_debug.dpi_scale_trans.inverted())
-    ax_box_dim = max(ax_bbox.width, ax_bbox.height)
+    if fig_for_debug is None:
+        ax_bbox = ax.get_tightbbox().transformed(ax.figure.dpi_scale_trans.inverted())
+        ax_box_dim = max(ax_bbox.width, ax_bbox.height)
+    else:
+        # Solution found at https://stackoverflow.com/questions/19306510/determine-matplotlib-axis-size-in-pixels
+        ax_bbox = ax.get_window_extent().transformed(fig_for_debug.dpi_scale_trans.inverted())
+        ax_box_dim = max(ax_bbox.width, ax_bbox.height)
     fig_dbg = plt.figure(
         figsize=((ax_box_dim), (ax_box_dim)), dpi=ax.get_figure().get_dpi()
     )  # , dpi=100, tight_layout=True) => tight_layout and dpi does not work with fixed size axes
@@ -846,9 +850,6 @@ def add_inline_labels(
     # Draw the figure before anything else
     ax.get_figure().canvas.draw_idle()
 
-    # Check that the figure belonging to the provided Axe has been passed via fig_for_debug in case debug=True
-    if debug and fig_for_debug is None:
-        raise ValueError("`fig_for_debug` has to be provided in case `debug=True`")
 
     # Nested progress bar does not work in every case => set overall and per label progress option mutualy exclusive
     if with_overall_progress and with_perlabel_progress:
