@@ -122,9 +122,8 @@ def get_axe_aspect(ax: Axes) -> float:
     figW, figH = ax.get_figure().get_size_inches()  # Total figure size
     _, _, w, h = ax.get_position().bounds  # Axis size on figure
     disp_ratio = (figH * h) / (figW * w)  # Ratio of display units
-    data_ratio = sub(*ax.get_ylim()) / sub(
-        *ax.get_xlim()
-    )  # Ratio of data units. Negative over negative because of the order of subtraction
+    # Ratio of data units. Negative over negative because of the order of subtraction
+    data_ratio = sub(*ax.get_ylim()) / sub(*ax.get_xlim())
     return disp_ratio / data_ratio
 
 
@@ -133,18 +132,19 @@ def get_dbg_axes(ax: Axes, fig_for_debug: Figure) -> Tuple[Axes, Axes]:
     - ax_data with lines build on data and inline labels
     - ax_geoms with the geometries used in label placement
     """
-    ax.get_figure().canvas.draw()
+    #! It is assumed here that ax.get_figure() has already been drawn in calling function
     plt.close("all")
     # Determine original Axes dimensions,
+    # TODO delete transformation to fig coordinates if only ax_bbox ratio is needed (see below) -> after an observation period starting with v0.1.6
     if fig_for_debug is None:
-        ax_bbox = ax.get_tightbbox().transformed(ax.figure.dpi_scale_trans.inverted())
-        ax_box_dim = max(ax_bbox.width, ax_bbox.height)
+        ax_bbox = ax.get_window_extent().transformed(ax.figure.dpi_scale_trans.inverted())
     else:
-        # Solution found at https://stackoverflow.com/questions/19306510/determine-matplotlib-axis-size-in-pixels
         ax_bbox = ax.get_window_extent().transformed(fig_for_debug.dpi_scale_trans.inverted())
-        ax_box_dim = max(ax_bbox.width, ax_bbox.height)
+    # ax_box_dim = max(ax_bbox.width, ax_bbox.height) # TODO delete after an observation period starting with v0.1.6
+
     fig_dbg = plt.figure(
-        figsize=((ax_box_dim), (ax_box_dim)), dpi=ax.get_figure().get_dpi()
+        # figsize=((ax_box_dim), (ax_box_dim)), # TODO delete after an observation period starting with v0.1.6
+        dpi=ax.get_figure().get_dpi(),
     )  # , dpi=100, tight_layout=True) => tight_layout and dpi does not work with fixed size axes
 
     pos = (0, 0, 1, 1)  # Position of the grid in the figure
@@ -847,9 +847,9 @@ def add_inline_labels(
         The figure of the input Axe with labels drawn inline on the input Axe
     """
 
-    # Draw the figure before anything else
-    ax.get_figure().canvas.draw_idle()
-
+    # Draw the figure before anything else, #! Note that draw_idle is not enough
+    # TODO see if it can be detected that the figure has already been drawn in case of multi axes figure
+    ax.get_figure().canvas.draw()
 
     # Nested progress bar does not work in every case => set overall and per label progress option mutualy exclusive
     if with_overall_progress and with_perlabel_progress:
