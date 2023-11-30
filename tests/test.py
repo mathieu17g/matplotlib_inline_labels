@@ -3,14 +3,18 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 from matplotlib.testing import setup
-import os, sys
+from datetime import datetime
+from matplotlib.dates import UTC, DateFormatter, DayLocator
+from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
+from scipy.stats import loglaplace, chi2
+from warnings import catch_warnings
+
+import os
+import sys
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
 from inline_labels import add_inline_labels
-from datetime import datetime
-from matplotlib.dates import UTC, DateFormatter, DayLocator
-from scipy.stats import loglaplace
-from warnings import catch_warnings
+
 
 
 # %%
@@ -132,7 +136,7 @@ def test_rotation_correction(setup_mpl):
     fig, ax = plt.subplots()
     ax.set_xlim(0, 1)
     ax.set_ylim(0, 1)
-    lines = plt.plot((0, 1), (0, 2), label="rescaled")
+    plt.plot((0, 1), (0, 2), label="rescaled")
 
     # Now label the line and THEN rescale the axes, to force label rotation
     add_inline_labels(plt.gca())
@@ -219,7 +223,6 @@ def test_polar(setup_mpl):
     plt.plot(np.cos(t), np.sin(t), label="$1/1$")
     plt.plot(np.cos(t), np.sin(2 * t), label="$1/2$")
     plt.plot(np.cos(3 * t), np.sin(t), label="$3/1$")
-    ax = plt.gca()
 
     add_inline_labels(plt.gca())
     return plt.gcf()
@@ -234,7 +237,6 @@ def test_non_uniform_and_negative_spacing(setup_mpl):
     x = [1, -2, -3, 2, -4, -3]
     plt.plot(x, [1, 2, 3, 4, 2, 1], ".-", label="apples")
     plt.plot(x, [6, 5, 4, 2, 5, 5], "o-", label="banana")
-    ax = plt.gca()
 
     add_inline_labels(plt.gca())
     return plt.gcf()
@@ -332,7 +334,6 @@ def test_errorbar_with_list(setup_mpl):
     np.random.seed(1234)
     fig, ax = plt.subplots(figsize=[10, 2])
     samples = ["a", "b"]
-    pos = [-1, 1]
 
     x = list(np.arange(-2, 2.1, 0.1))
     ys = [list(np.random.rand(len(x))), list(np.random.rand(len(x)))]
@@ -380,6 +381,8 @@ def test_unplaced_labels_without_warning(setup_mpl):
 
 
 _ = test_unplaced_labels_without_warning(setup_mpl)
+
+
 # %%
 @pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
 def test_unplaced_labels_with_warning(setup_mpl):
@@ -395,6 +398,8 @@ def test_unplaced_labels_with_warning(setup_mpl):
 
 
 _ = test_unplaced_labels_with_warning(setup_mpl)
+
+
 # %%
 @pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
 def test_multiple_labels_with_overall_progress(setup_mpl):
@@ -409,6 +414,8 @@ def test_multiple_labels_with_overall_progress(setup_mpl):
 
 
 _ = test_multiple_labels_with_overall_progress(setup_mpl)
+
+
 # %%
 @pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
 def test_multiple_labels_with_perlabel_progress(setup_mpl):
@@ -423,4 +430,67 @@ def test_multiple_labels_with_perlabel_progress(setup_mpl):
 
 
 _ = test_multiple_labels_with_perlabel_progress(setup_mpl)
+
+
+@pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
+def test_fig_correctly_drawn_before_finding_label_placement(setup_mpl):
+    # Two identical subplots, with a huge title on the second should yield the
+    # same label positionning and angles which is an issue when not drawing
+    # the figure before launching the placement algorithm: line geometries wrongly
+    # placed.
+    # Issue fixed in release 0.1.7 by using fig.draw instead of fig.draw_idle
+    fig, (ax1, ax2) = plt.subplots(1, 2, sharex=True)
+
+    X = np.linspace(0, 1, 500)
+    A = [1, 2, 5, 10, 20]
+
+    for a in A:
+        ax1.semilogx(X, chi2(5).pdf(a * X), label=f"Line {a}")
+        ax2.semilogx(X, chi2(5).pdf(a * X), label=f"Line {a}")
+
+    ax2.set_title("Title", fontsize=50)
+
+    add_inline_labels(ax1)
+    add_inline_labels(ax2)
+
+    return fig
+
+
+_ = test_fig_correctly_drawn_before_finding_label_placement(setup_mpl)
+
+
 # %%
+@pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
+def test_multiple_subplots_with_gridspec(setup_mpl):
+    X = np.linspace(0, 1, 500)
+    A = [1, 2, 5, 10, 20]
+    with plt.style.context("fivethirtyeight"):
+        fig = plt.figure(tight_layout=True, dpi=300, figsize=(20, 15))
+        gsc = GridSpec(3, 1, figure=fig, height_ratios=[1, 0.5, 1.5])  # Gridspec with column of n lines
+        gsl = []  # Initialize line subgridspec list
+        axs = []  # Initialize axe list on vertical dimension
+        for i in range(3):
+            # Add to subgridspec list, gridspec for i-th line
+            gsl.append(GridSpecFromSubplotSpec(1, 3, subplot_spec=gsc[i], width_ratios=[1, 0.5, 1.5]))
+            # Add 2nd horizontal dimension to the axe list
+            axs.append([])
+            for j in range(3):
+                axs[i].append(fig.add_subplot(gsl[i][0, j]))
+                for a in A: axs[i][j].semilogx(X, chi2(5).pdf(a * X), label=f"{a=}")
+                # Add axe title
+                axs[i][j].set_title(f"Graph[{i+1}][{j+1}]")
+                # Y-axis label on fist plot of each row only
+                if j == 0: axs[i][j].set_ylabel("Y=chi2(5).pdf(aX) with\na in [1, 2, 5, 10, 20]")  
+                # For second colum set y max to 0.2
+                if j == 1: axs[i][j].set_ylim(top=0.2)  
+                # For third colum set y max to 0.1
+                if j == 2: axs[i][j].set_ylim(top=0.1)  
+
+        for i in range(3):
+            for j in range(3):
+                add_inline_labels(axs[i][j])
+
+    return fig
+
+
+_ = test_multiple_subplots_with_gridspec(setup_mpl)
