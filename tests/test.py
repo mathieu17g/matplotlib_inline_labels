@@ -21,7 +21,7 @@ from inline_labels import add_inline_labels
 @pytest.fixture()
 def setup_mpl():
     setup()
-    plt.clf()
+    plt.close()
 
 
 # %%
