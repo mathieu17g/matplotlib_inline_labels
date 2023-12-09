@@ -18,15 +18,8 @@ from inline_labels import add_inline_labels
 
 
 # %%
-@pytest.fixture()
-def setup_mpl():
-    setup()
-    plt.close()
-
-
-# %%
 @pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
-def test_linspace(setup_mpl):
+def test_linspace():
     x = np.linspace(0, 1)
     K = [1, 2, 4]
 
@@ -39,12 +32,12 @@ def test_linspace(setup_mpl):
     return plt.gcf()
 
 
-_ = test_linspace(setup_mpl)
+_ = test_linspace()
 
 
 # %%
 @pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
-def test_linspace_with_visualdebug(setup_mpl):
+def test_linspace_with_visualdebug():
     x = np.linspace(0, 1)
     K = [1, 2, 4]
 
@@ -58,12 +51,12 @@ def test_linspace_with_visualdebug(setup_mpl):
     return plt.gcf()
 
 
-_ = test_linspace_with_visualdebug(setup_mpl)
+_ = test_linspace_with_visualdebug()
 
 
 # %%
 @pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
-def test_ylogspace(setup_mpl):
+def test_ylogspace():
     x = np.linspace(0, 1)
     K = [1, 2, 4]
 
@@ -77,12 +70,12 @@ def test_ylogspace(setup_mpl):
     return plt.gcf()
 
 
-_ = test_ylogspace(setup_mpl)
+_ = test_ylogspace()
 
 
 # %%
 @pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
-def test_xlogspace(setup_mpl):
+def test_xlogspace():
     x = np.linspace(0, 10)
     K = [1, 2, 4]
 
@@ -99,13 +92,13 @@ def test_xlogspace(setup_mpl):
     return plt.gcf()
 
 
-_ = test_xlogspace(setup_mpl)
+_ = test_xlogspace()
 
 
 # %%
 # @pytest.mark.xfail(sys.platform.startswith('linux'), reason="pytest-mpl does not yield same figure between test and baseline generation on Linux")
 @pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
-def test_xylogspace(setup_mpl):
+def test_xylogspace():
     #! Necessary to specify a figsize on linux, otherwise baseline generated image different from test output image
     plt.subplots(figsize=(6.4, 4.8))
     x = np.geomspace(0.1, 1e1)
@@ -125,13 +118,13 @@ def test_xylogspace(setup_mpl):
     return plt.gcf()
 
 
-_ = test_xylogspace(setup_mpl)
+_ = test_xylogspace()
 
 
 # %%
 @pytest.mark.skip(reason="Label rotation with x or y limits modification not supported yet")
 @pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
-def test_rotation_correction(setup_mpl):
+def test_rotation_correction():
     # Fix axes limits and plot line
     fig, ax = plt.subplots()
     ax.set_xlim(0, 1)
@@ -145,24 +138,24 @@ def test_rotation_correction(setup_mpl):
     return fig
 
 
-_ = test_rotation_correction(setup_mpl)
+_ = test_rotation_correction()
 
 
 # %%
 @pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
-def test_vertical(setup_mpl):
+def test_vertical():
     x = 0.5
     plt.axvline(x, label="axvline")
     add_inline_labels(plt.gca())
     return plt.gcf()
 
 
-_ = test_vertical(setup_mpl)
+_ = test_vertical()
 
 
 # %%
 @pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
-def test_labels_range(setup_mpl):
+def test_labels_range():
     x = np.linspace(0, 1)
 
     plt.plot(x, np.sin(x), label=r"$\sin x$")
@@ -172,12 +165,12 @@ def test_labels_range(setup_mpl):
     return plt.gcf()
 
 
-_ = test_labels_range(setup_mpl)
+_ = test_labels_range()
 
 
 # %%
 @pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
-def test_dateaxis_naive(setup_mpl):
+def test_dateaxis_naive():
     dates = [datetime(2018, 11, 1), datetime(2018, 11, 2), datetime(2018, 11, 3)]
 
     plt.plot(dates, [0, 5, 3], label="apples")
@@ -190,12 +183,12 @@ def test_dateaxis_naive(setup_mpl):
     return plt.gcf()
 
 
-_ = test_dateaxis_naive(setup_mpl)
+_ = test_dateaxis_naive()
 
 
 # %%
 @pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
-def test_dateaxis_advanced(setup_mpl):
+def test_dateaxis_advanced():
     dates = [
         datetime(2018, 11, 1, tzinfo=UTC),
         datetime(2018, 11, 2, tzinfo=UTC),
@@ -213,12 +206,12 @@ def test_dateaxis_advanced(setup_mpl):
     return plt.gcf()
 
 
-_ = test_dateaxis_advanced(setup_mpl)
+_ = test_dateaxis_advanced()
 
 
 # %%
 @pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
-def test_polar(setup_mpl):
+def test_polar():
     t = np.linspace(0, 2 * np.pi, num=128)
     plt.plot(np.cos(t), np.sin(t), label="$1/1$")
     plt.plot(np.cos(t), np.sin(2 * t), label="$1/2$")
@@ -228,12 +221,12 @@ def test_polar(setup_mpl):
     return plt.gcf()
 
 
-_ = test_polar(setup_mpl)
+_ = test_polar()
 
 
 # %%
 @pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
-def test_non_uniform_and_negative_spacing(setup_mpl):
+def test_non_uniform_and_negative_spacing():
     x = [1, -2, -3, 2, -4, -3]
     plt.plot(x, [1, 2, 3, 4, 2, 1], ".-", label="apples")
     plt.plot(x, [6, 5, 4, 2, 5, 5], "o-", label="banana")
@@ -242,12 +235,12 @@ def test_non_uniform_and_negative_spacing(setup_mpl):
     return plt.gcf()
 
 
-_ = test_non_uniform_and_negative_spacing(setup_mpl)
+_ = test_non_uniform_and_negative_spacing()
 
 
 # %%
 @pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
-def test_errorbar(setup_mpl):
+def test_errorbar():
     x = np.linspace(0, 1, 20)
 
     y = x**0.5
@@ -262,12 +255,12 @@ def test_errorbar(setup_mpl):
     return plt.gcf()
 
 
-_ = test_errorbar(setup_mpl)
+_ = test_errorbar()
 
 
 # %%
 @pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
-def test_negative_spacing(setup_mpl):
+def test_negative_spacing():
     x = np.linspace(1, -1)
     y = x**2
     plt.plot(x, y, label="Test")[0]
@@ -276,12 +269,12 @@ def test_negative_spacing(setup_mpl):
     return plt.gcf()
 
 
-_ = test_negative_spacing(setup_mpl)
+_ = test_negative_spacing()
 
 
 # %%
 @pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
-def test_label_datetime_plot(setup_mpl):
+def test_label_datetime_plot():
     plt.clf()
     # data from the chinook database of iTunes music sales
     x = np.array(
@@ -308,12 +301,12 @@ def test_label_datetime_plot(setup_mpl):
     return plt.gcf()
 
 
-_ = test_label_datetime_plot(setup_mpl)
+_ = test_label_datetime_plot()
 
 
 # %%
 @pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
-def test_auto_layout(setup_mpl):
+def test_auto_layout():
     X = [[1, 2], [0, 1]]
     Y = [[0, 1], [0, 1]]
 
@@ -325,12 +318,12 @@ def test_auto_layout(setup_mpl):
     return plt.gcf()
 
 
-_ = test_auto_layout(setup_mpl)
+_ = test_auto_layout()
 
 
 # %%
 @pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
-def test_errorbar_with_list(setup_mpl):
+def test_errorbar_with_list():
     np.random.seed(1234)
     fig, ax = plt.subplots(figsize=[10, 2])
     samples = ["a", "b"]
@@ -346,7 +339,7 @@ def test_errorbar_with_list(setup_mpl):
     return fig
 
 
-_ = test_errorbar_with_list(setup_mpl)
+_ = test_errorbar_with_list()
 
 
 # %%
@@ -354,7 +347,7 @@ _ = test_errorbar_with_list(setup_mpl)
     reason="For a Line 2D built with axhline, x data coordinates are in Axes coordinates. Cannot figure how to identify it among the Line2D of an Axes"
 )
 @pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
-def test_labeling_axhline(setup_mpl):
+def test_labeling_axhline():
     fig, ax = plt.subplots()
     ax.plot([10, 12, 13], [1, 2, 3], label="plot")
     ax.axhline(y=2, label="axhline")
@@ -363,12 +356,12 @@ def test_labeling_axhline(setup_mpl):
     return fig
 
 
-_ = test_labeling_axhline(setup_mpl)
+_ = test_labeling_axhline()
 
 
 # %%
 @pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
-def test_unplaced_labels_without_warning(setup_mpl):
+def test_unplaced_labels_without_warning():
     #! Necessary to specify a figsize on linux, otherwise baseline generated image different from test output image
     plt.subplots(figsize=(6.4, 4.8))
     X = np.linspace(0, 1, 500)
@@ -380,12 +373,12 @@ def test_unplaced_labels_without_warning(setup_mpl):
     return plt.gcf()
 
 
-_ = test_unplaced_labels_without_warning(setup_mpl)
+_ = test_unplaced_labels_without_warning()
 
 
 # %%
 @pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
-def test_unplaced_labels_with_warning(setup_mpl):
+def test_unplaced_labels_with_warning():
     #! Necessary to specify a figsize on linux, otherwise baseline generated image different from test output image
     plt.subplots(figsize=(6.4, 4.8))
     X = np.linspace(0, 1, 500)
@@ -397,12 +390,12 @@ def test_unplaced_labels_with_warning(setup_mpl):
     return plt.gcf()
 
 
-_ = test_unplaced_labels_with_warning(setup_mpl)
+_ = test_unplaced_labels_with_warning()
 
 
 # %%
 @pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
-def test_multiple_labels_with_overall_progress(setup_mpl):
+def test_multiple_labels_with_overall_progress():
     #! Necessary to specify a figsize on linux, otherwise baseline generated image different from test output image
     plt.subplots(figsize=(6.4, 4.8))
     X = np.linspace(0, 1, 500)
@@ -413,12 +406,12 @@ def test_multiple_labels_with_overall_progress(setup_mpl):
     return plt.gcf()
 
 
-_ = test_multiple_labels_with_overall_progress(setup_mpl)
+_ = test_multiple_labels_with_overall_progress()
 
 
 # %%
 @pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
-def test_multiple_labels_with_perlabel_progress(setup_mpl):
+def test_multiple_labels_with_perlabel_progress():
     #! Necessary to specify a figsize on linux, otherwise baseline generated image different from test output image
     plt.subplots(figsize=(6.4, 4.8))
     X = np.linspace(0, 1, 500)
@@ -429,11 +422,11 @@ def test_multiple_labels_with_perlabel_progress(setup_mpl):
     return plt.gcf()
 
 
-_ = test_multiple_labels_with_perlabel_progress(setup_mpl)
+_ = test_multiple_labels_with_perlabel_progress()
 
 
 @pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
-def test_fig_correctly_drawn_before_finding_label_placement(setup_mpl):
+def test_fig_correctly_drawn_before_finding_label_placement():
     # Two identical subplots, with a huge title on the second should yield the
     # same label positionning and angles which is an issue when not drawing
     # the figure before launching the placement algorithm: line geometries wrongly
@@ -456,12 +449,12 @@ def test_fig_correctly_drawn_before_finding_label_placement(setup_mpl):
     return fig
 
 
-_ = test_fig_correctly_drawn_before_finding_label_placement(setup_mpl)
+_ = test_fig_correctly_drawn_before_finding_label_placement()
 
 
 # %%
 @pytest.mark.mpl_image_compare(savefig_kwargs={"bbox_inches": "tight"})
-def test_multiple_subplots_with_gridspec(setup_mpl):
+def test_multiple_subplots_with_gridspec():
     X = np.linspace(0, 1, 500)
     A = [1, 2, 5, 10, 20]
     with plt.style.context("fivethirtyeight"):
@@ -493,4 +486,6 @@ def test_multiple_subplots_with_gridspec(setup_mpl):
     return fig
 
 
-_ = test_multiple_subplots_with_gridspec(setup_mpl)
+_ = test_multiple_subplots_with_gridspec()
+
+# %%
