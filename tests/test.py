@@ -52,7 +52,7 @@ def test_linspace_with_visualdebug(setup_mpl):
         plt.plot(x, np.sin(k * x), label=rf"$f(x)=\sin({k} x)$")
 
     #! savefig_kwargs={"bbox_inches": "tight"} is necessary to properly save visual debug image
-    add_inline_labels(plt.gca(), debug=True, fig_for_debug=plt.gcf())
+    add_inline_labels(plt.gca(), debug=True)
     plt.xlabel("$x$")
     plt.ylabel("$f(x)$")
     return plt.gcf()
