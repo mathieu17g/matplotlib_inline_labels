@@ -815,7 +815,8 @@ def plot_label_centers_position_candidates(
 
 def add_inline_labels(
     ax: Axes,
-    ppf: float = 1,
+    ppf: float = 1,  # Prosition precision factor
+    po: str = "default",  # Placement option
     with_overall_progress: bool = False,
     overall_progress_desc: str = "Label placement",
     with_perlabel_progress: bool = False,
@@ -1146,78 +1147,94 @@ def add_inline_labels(
                     if debug:
                         plot_label_centers_position_candidates(ax_geoms, mls_lpc, lbbfl, label)
 
-            # Pick the best position candidate
-            # TODO do better than choose only the center of a continous list of center candidates:
-            # take into account neighbours if they have a lower alignment error
-            bsl = None
+    # TODO add progress info
+    #############################
+    # Find best label positions #
+    #############################
+
+    if po == "default": #! Default label best position algorithm: center of longuest contiguous label position candidates
+        # For each label, take the middle of the longuest continuous label position candidate list starting from the best separation level to the least
+        bsld = {} # best solution list, per labe) dictionary
+        for label in linelikeLabels:
+            bsld[label] = None
             # Search for the longest continuous label position candidate list starting from the best separation level to the least
             for bf in lbbfl:
                 if len(mls_lpc[label][bf]) > 1:
-                    bsl = mls_lpc[label][bf][np.argmax([len(continuous_ls_lpc) for continuous_ls_lpc in mls_lpc[label][bf]])]
-                    if len(bsl) > 0:
+                    bsld[label] = mls_lpc[label][bf][np.argmax([len(cont_ls_lpc) for cont_ls_lpc in mls_lpc[label][bf]])]
+                    if len(bsld[label]) > 0:
                         break
                 elif len(mls_lpc[label][bf]) == 1:
-                    bsl = mls_lpc[label][bf][0]
-                    if len(bsl) > 0:
+                    bsld[label] = mls_lpc[label][bf][0]
+                    if len(bsld[label]) > 0:
                         break
-            if bsl is None or len(bsl) == 0:
+            if bsld[label] is None or len(bsld[label]) == 0:
+                # Add label to the list of labels with no non overlapping placement available. To be drawn in a standard.
                 legend_labels.append(label)
-            else:
-                bpc = bsl[len(bsl) // 2]
-                trans_geom2data = get_geom2disp_trans(ax) + ax.transData.inverted()
-                l_x, l_y = trans_geom2data.transform((bpc["c_geom"].x, bpc["c_geom"].y))
-                # Plot labels on ax
-                labelText = ax.text(
-                    l_x,
-                    l_y,
-                    label,
-                    color=linelikeHandles[linelikeLabels.index(label)].get_color(),
-                    backgroundcolor=ax.get_facecolor(),
-                    horizontalalignment="center",
-                    verticalalignment="center",
-                    rotation=math.degrees(bpc["theta"]),
-                    bbox=dict(boxstyle="square, pad=0.3", mutation_aspect=1 / 10, fc=ax.get_facecolor(), lw=0),
-                    **l_text_kwarg,
-                )
-                fprop = labelText.get_fontproperties()
-                if debug:  # Plot labels' boxes on ax_data and chosen labels' centers on ax_geoms
-                    ax_data.text(
-                        l_x,
-                        l_y,
-                        label,
-                        fontproperties=fprop,
-                        color=data_linelikeHandles[data_linelikeLabels.index(label)].get_color(),
-                        backgroundcolor=ax_data.get_facecolor(),
-                        horizontalalignment="center",
-                        verticalalignment="center",
-                        rotation=math.degrees(bpc["theta"]),
-                        bbox=dict(
-                            boxstyle="square, pad=0.3",
-                            mutation_aspect=1 / 10,
-                            fc=ax_data.get_facecolor(),
-                            ec=data_linelikeHandles[data_linelikeLabels.index(label)].get_color(),
-                            lw=0.1,
-                        ),
-                        **l_text_kwarg,
-                    )
-                    ax_geoms.plot(
-                        bpc["c_geom"].x,
-                        bpc["c_geom"].y,
-                        marker="o",
-                        color="k",
-                        markersize=10,
-                        ls="",
-                        transform=get_geom2disp_trans(ax_geoms),
-                    )
-                    # Get the label box in geom coordinates
-                    rtl_box = shp.boundary(get_lbox_geom(type="box", theta=bpc["theta"], c=bpc["c_geom"]))
-                    # Plot the label box used in algorithm
-                    ax_geoms.plot(
-                        *(shp.get_coordinates(rtl_box).T),
-                        color="k",
-                        linewidth=0.5,
-                        transform=get_geom2disp_trans(ax_geoms),
-                    )
+                # Delete label from list of label with non overlaping position candidates
+                del bsld[label]
+        bpcd = {} # Best label position candidate, per label dictionary 
+        for label in list(bsld):
+            bpcd[label] = bsld[label][len(bsld[label]) // 2]
+    # TODO: Add new algorithms
+    else:
+        raise ValueError("po (positionning option): must be one of 'default'")
+
+    #############################
+    # Draw label for each label #
+    #############################
+
+    for label in list(bpcd):
+        trans_geom2data = get_geom2disp_trans(ax) + ax.transData.inverted()
+        l_x, l_y = trans_geom2data.transform((bpcd[label]["c_geom"].x, bpcd[label]["c_geom"].y))
+        # Plot labels on ax
+        labelText = ax.text(
+            l_x,
+            l_y,
+            label,
+            color=linelikeHandles[linelikeLabels.index(label)].get_color(),
+            backgroundcolor=ax.get_facecolor(),
+            horizontalalignment="center",
+            verticalalignment="center",
+            rotation=math.degrees(bpcd[label]["theta"]),
+            bbox=dict(boxstyle="square, pad=0.3", mutation_aspect=1 / 10, fc=ax.get_facecolor(), lw=0),
+            **l_text_kwarg,
+        )
+        fprop = labelText.get_fontproperties()
+        if debug:  # Plot labels' boxes on ax_data and chosen labels' centers on ax_geoms
+            ax_data.text(
+                l_x,
+                l_y,
+                label,
+                fontproperties=fprop,
+                color=data_linelikeHandles[data_linelikeLabels.index(label)].get_color(),
+                backgroundcolor=ax_data.get_facecolor(),
+                horizontalalignment="center",
+                verticalalignment="center",
+                rotation=math.degrees(bpcd[label]["theta"]),
+                bbox=dict(
+                    boxstyle="square, pad=0.3",
+                    mutation_aspect=1 / 10,
+                    fc=ax_data.get_facecolor(),
+                    ec=data_linelikeHandles[data_linelikeLabels.index(label)].get_color(),
+                    lw=0.1,
+                ),
+                **l_text_kwarg,
+            )
+            ax_geoms.plot(
+                bpcd[label]["c_geom"].x,
+                bpcd[label]["c_geom"].y,
+                marker="o",
+                color="k",
+                markersize=10,
+                ls="",
+                transform=get_geom2disp_trans(ax_geoms),
+            )
+            # Get the label box in geom coordinates
+            rtl_box = shp.boundary(get_lbox_geom(type="box", theta=bpcd[label]["theta"], c=bpcd[label]["c_geom"]))
+            # Plot the label box used in algorithm
+            ax_geoms.plot(
+                *(shp.get_coordinates(rtl_box).T), color="k", linewidth=0.5, transform=get_geom2disp_trans(ax_geoms)
+            )
 
     # ? Add a legend for all handles which are not line like artists according to function retrieve_lines_and_labels
 
