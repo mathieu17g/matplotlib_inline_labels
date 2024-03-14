@@ -4,7 +4,7 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "matplotlib_inline_labels"
-version = "0.1.7"
+version = "0.2.0.dev"
 authors = [{name = "mathieu17g", email = "mathieu19g@icloud.com"}]
 description = "Inline line labels for matplotlib with automatic positionning"
 readme = "README.md"
@@ -42,12 +42,15 @@ name = "inline_labels"
 
 [tool.pyright]
 include = ["src"]
+typeCheckingMode = "standard"
+verboseOutput = true
 
 [tool.black]
-line-length = 125
+line-length = 92
+enable-unstable-feature = ["string_processing"]
 
 [tool.ruff]
-line-length = 125
+line-length = 92
 
 [tool.coverage.run]
 branch = true

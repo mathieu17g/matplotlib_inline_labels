@@ -21,7 +21,7 @@ jobs:
         - uses: actions/checkout@v4
 
         - name: Setup Python
-          uses: actions/setup-python@v4
+          uses: actions/setup-python@v5
           with:
             python-version: ${{ matrix.python }} 
         
@@ -62,20 +62,20 @@ jobs:
         # always attempt to upload artifacts, even(and especially) in case of failure.
         - name: Upload pytest-mpl report
           if: always()
-          uses: actions/upload-artifact@v3
+          uses: actions/upload-artifact@v4
           with:
             name: pytest_mpl_results_${{ matrix.os }}_${{ matrix.python }}
             path: tests/pytest_mpl_results_${{ matrix.os }}_${{ matrix.python }}/*
 
         - name: Upload pytest-mpl new baseline
           if: always()
-          uses: actions/upload-artifact@v3
+          uses: actions/upload-artifact@v4
           with:
             name: pytest_mpl_new_baseline_${{ matrix.os }}_${{ matrix.python }}
             path: tests/pytest_mpl_new_baseline_${{ matrix.os }}_${{ matrix.python }}/*
             if-no-files-found: ignore
 
         - name: Upload coverage reports to Codecov
-          uses: codecov/codecov-action@v3
+          uses: codecov/codecov-action@v4
           env:
             CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
