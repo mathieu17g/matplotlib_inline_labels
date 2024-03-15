@@ -342,7 +342,7 @@ def add_inline_labels(
 
     if debug:
         for k, v in Timer.timers.items():
-            print("Elapsed time for " + esc("38;5;39") + k + esc(0) + f": {v:0.4f} seconds")
+            print("Elapsed time for " + esc('38;5;39') + k + esc(0) + f": {v:0.4f} seconds")
         return ax_data.get_figure()  # pyright: ignore[reportPossiblyUnboundVariable]
     else:
         return ax.get_figure()
