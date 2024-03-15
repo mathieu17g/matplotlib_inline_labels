@@ -280,7 +280,36 @@ def plot_labels_PRcs(
 
 def draw_inlined_labels(
     ax: Axes,
-    debug: bool,
+    l_text_kwarg: dict[str, Any],
+    linelikeHandles: list[Line2D],
+    linelikeLabels: list[str],
+    lis: Label_Inlining_Solutions,
+):
+    for label in list(lis):
+        trans_geom2data = get_geom2disp_trans(ax) + ax.transData.inverted()
+        l_x, l_y = trans_geom2data.transform((lis[label].cpt.x, lis[label].cpt.y))
+        # Plot labels on ax
+        ax.text(
+            l_x,
+            l_y,
+            label,
+            color=linelikeHandles[linelikeLabels.index(label)].get_color(),
+            backgroundcolor=ax.get_facecolor(),
+            horizontalalignment="center",
+            verticalalignment="center",
+            rotation=degrees(lis[label].rot),
+            bbox=dict(
+                boxstyle="square, pad=0.3",
+                mutation_aspect=1 / 10,
+                fc=ax.get_facecolor(),
+                lw=0,
+            ),
+            **l_text_kwarg,
+        )
+
+
+def draw_dbg_inlined_labels(
+    ax: Axes,
     l_text_kwarg: dict[str, Any],
     ax_data: Axes,
     ax_geoms: Axes,
@@ -313,63 +342,77 @@ def draw_inlined_labels(
             **l_text_kwarg,
         )
         fprop = labelText.get_fontproperties()
-        if debug:  # Plot labels' boxes on ax_data and chosen labels' centers on ax_geoms
-            ax_data.text(  # pyright: ignore[reportPossiblyUnboundVariable]
-                l_x,
-                l_y,
-                label,
-                fontproperties=fprop,
-                color=data_linelikeHandles[  # pyright: ignore[reportPossiblyUnboundVariable]
+        # Plot labels' boxes on ax_data and chosen labels' centers on ax_geoms
+        ax_data.text(  # pyright: ignore[reportPossiblyUnboundVariable]
+            l_x,
+            l_y,
+            label,
+            fontproperties=fprop,
+            color=data_linelikeHandles[  # pyright: ignore[reportPossiblyUnboundVariable]
+                data_linelikeLabels.index(  # pyright: ignore[reportPossiblyUnboundVariable]
+                    label
+                )
+            ].get_color(),
+            backgroundcolor=ax_data.get_facecolor(),  # pyright: ignore[reportPossiblyUnboundVariable]
+            horizontalalignment="center",
+            verticalalignment="center",
+            rotation=degrees(lis[label].rot),
+            bbox=dict(
+                boxstyle="square, pad=0.3",
+                mutation_aspect=1 / 10,
+                fc=ax_data.get_facecolor(),  # pyright: ignore[reportPossiblyUnboundVariable]
+                ec=data_linelikeHandles[  # pyright: ignore[reportPossiblyUnboundVariable]
                     data_linelikeLabels.index(  # pyright: ignore[reportPossiblyUnboundVariable]
                         label
                     )
                 ].get_color(),
-                backgroundcolor=ax_data.get_facecolor(),  # pyright: ignore[reportPossiblyUnboundVariable]
-                horizontalalignment="center",
-                verticalalignment="center",
-                rotation=degrees(lis[label].rot),
-                bbox=dict(
-                    boxstyle="square, pad=0.3",
-                    mutation_aspect=1 / 10,
-                    fc=ax_data.get_facecolor(),  # pyright: ignore[reportPossiblyUnboundVariable]
-                    ec=data_linelikeHandles[  # pyright: ignore[reportPossiblyUnboundVariable]
-                        data_linelikeLabels.index(  # pyright: ignore[reportPossiblyUnboundVariable]
-                            label
-                        )
-                    ].get_color(),
-                    lw=0.1,
-                ),
-                **l_text_kwarg,
+                lw=0.1,
+            ),
+            **l_text_kwarg,
+        )
+        ax_geoms.plot(  # pyright: ignore[reportPossiblyUnboundVariable]
+            lis[label].cpt.x,
+            lis[label].cpt.y,
+            marker="o",
+            color="k",
+            markersize=10,
+            ls="",
+            transform=get_geom2disp_trans(
+                ax_geoms  # pyright: ignore[reportPossiblyUnboundVariable]
+            ),
+        )
+        # Get the label box in geom coordinates
+        rtl_box = shp.boundary(
+            get_lbox_geom(  # pyright: ignore[reportPossiblyUnboundVariable]
+                "box", lis[label].cpt, lis[label].rot
             )
-            ax_geoms.plot(  # pyright: ignore[reportPossiblyUnboundVariable]
-                lis[label].cpt.x,
-                lis[label].cpt.y,
-                marker="o",
-                color="k",
-                markersize=10,
-                ls="",
-                transform=get_geom2disp_trans(
-                    ax_geoms  # pyright: ignore[reportPossiblyUnboundVariable]
-                ),
-            )
-            # Get the label box in geom coordinates
-            rtl_box = shp.boundary(
-                get_lbox_geom(  # pyright: ignore[reportPossiblyUnboundVariable]
-                    "box", lis[label].cpt, lis[label].rot
-                )
-            )
-            # Plot the label box used in algorithm
-            ax_geoms.plot(  # pyright: ignore[reportPossiblyUnboundVariable]
-                *(shp.get_coordinates(rtl_box).T),
-                color="k",
-                linewidth=0.5,
-                transform=get_geom2disp_trans(
-                    ax_geoms  # pyright: ignore[reportPossiblyUnboundVariable]
-                ),
-            )
+        )
+        # Plot the label box used in algorithm
+        ax_geoms.plot(  # pyright: ignore[reportPossiblyUnboundVariable]
+            *(shp.get_coordinates(rtl_box).T),
+            color="k",
+            linewidth=0.5,
+            transform=get_geom2disp_trans(
+                ax_geoms  # pyright: ignore[reportPossiblyUnboundVariable]
+            ),
+        )
 
 
 def add_noninlined_labels_legend(
+    ax: Axes,
+    l_text_kwarg: dict[str, Any],
+    linelikeHandles: list[Line2D],
+    linelikeLabels: list[str],
+    legend_labels: list[str],
+):
+    ax.legend(
+        handles=[linelikeHandles[linelikeLabels.index(label)] for label in legend_labels],
+        labels=legend_labels,
+        facecolor=ax.get_facecolor(),
+        **l_text_kwarg,
+    )
+
+def add_dbg_noninlined_labels_legend(
     ax: Axes,
     debug: bool,
     l_text_kwarg: dict[str, Any],

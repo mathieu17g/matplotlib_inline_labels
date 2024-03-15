@@ -394,7 +394,7 @@ def test_unplaced_labels_with_warning():
             label=f"Line {a}",
         )
     with pytest.warns(UserWarning):
-        add_inline_labels(plt.gca(), fontsize="x-large", nowarn=False)
+        add_inline_labels(plt.gca(), debug=True, fontsize="x-large")
     return plt.gcf()
 
 

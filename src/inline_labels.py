@@ -16,7 +16,9 @@ from drawing import (
     plot_geometric_line_chunks,
     plot_labels_PRcs,
     draw_inlined_labels,
+    draw_dbg_inlined_labels,
     add_noninlined_labels_legend,
+    add_dbg_noninlined_labels_legend,
 )
 from geometries import (
     get_axe_lines_geometries,
@@ -296,19 +298,21 @@ def add_inline_labels(
     #############################
 
     # ? split into non debug and debug version?
-    draw_inlined_labels(
-        ax,
-        debug,
-        l_text_kwarg,
-        ax_data,  # pyright: ignore[reportPossiblyUnboundVariable]
-        ax_geoms,  # pyright: ignore[reportPossiblyUnboundVariable]
-        linelikeHandles,
-        linelikeLabels,
-        data_linelikeHandles,  # pyright: ignore[reportPossiblyUnboundVariable]
-        data_linelikeLabels,  # pyright: ignore[reportPossiblyUnboundVariable]
-        get_lbox_geom,  # pyright: ignore[reportPossiblyUnboundVariable]
-        lis,
-    )
+    if not debug:
+        draw_inlined_labels(ax, l_text_kwarg, linelikeHandles, linelikeLabels, lis)
+    else:
+        draw_dbg_inlined_labels(
+            ax,
+            l_text_kwarg,
+            ax_data,  # pyright: ignore[reportPossiblyUnboundVariable]
+            ax_geoms,  # pyright: ignore[reportPossiblyUnboundVariable]
+            linelikeHandles,
+            linelikeLabels,
+            data_linelikeHandles,  # pyright: ignore[reportPossiblyUnboundVariable]
+            data_linelikeLabels,  # pyright: ignore[reportPossiblyUnboundVariable]
+            get_lbox_geom,  # pyright: ignore[reportPossiblyUnboundVariable]
+            lis,
+        )
 
     # ? Add a legend for all handles which are not line like artists according to function
     # ? retrieve_lines_and_labels
@@ -317,19 +321,24 @@ def add_inline_labels(
     if legend_labels and debug:
         warn(f"Unplaced labels : {legend_labels}")
     if legend_labels and (len(legend_labels) != len(linelikeLabels)):
-        add_noninlined_labels_legend(
-            ax,
-            debug,
-            l_text_kwarg,
-            ax_data,  # pyright: ignore[reportPossiblyUnboundVariable]
-            ax_geoms,  # pyright: ignore[reportPossiblyUnboundVariable]
-            linelikeHandles,
-            linelikeLabels,
-            data_linelikeHandles,  # pyright: ignore[reportPossiblyUnboundVariable]
-            data_linelikeLabels,  # pyright: ignore[reportPossiblyUnboundVariable]
-            legend_labels,
-            partial_ax_geoms_legend,  # pyright: ignore[reportPossiblyUnboundVariable]
-        )
+        if not debug:
+            add_noninlined_labels_legend(
+                ax, l_text_kwarg, linelikeHandles, linelikeLabels, legend_labels
+            )
+        else:
+            add_dbg_noninlined_labels_legend(
+                ax,
+                debug,
+                l_text_kwarg,
+                ax_data,  # pyright: ignore[reportPossiblyUnboundVariable]
+                ax_geoms,  # pyright: ignore[reportPossiblyUnboundVariable]
+                linelikeHandles,
+                linelikeLabels,
+                data_linelikeHandles,  # pyright: ignore[reportPossiblyUnboundVariable]
+                data_linelikeLabels,  # pyright: ignore[reportPossiblyUnboundVariable]
+                legend_labels,
+                partial_ax_geoms_legend,  # pyright: ignore[reportPossiblyUnboundVariable]
+            )
 
     if debug:
         for k, v in Timer.timers.items():
