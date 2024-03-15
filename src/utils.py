@@ -14,18 +14,22 @@ def timer(func):
         value = func(*args, **kwargs)
         toc = perf_counter()
         elapsed_time = toc - tic
-        print(f"Elapsed time for {esc("38;5;39")}{func.__name__}{esc(0)}: {elapsed_time:0.4f} seconds")
+        print(
+            f"Elapsed time for {esc('38;5;39')}{func.__name__}{esc(0)}:"
+            f" {elapsed_time:0.4f} seconds"
+        )
         return value
 
     return wrapper_timer
 
 
-
 def esc(code):
     return f"\033[{code}m"
 
+
 class TimerError(Exception):
     """A custom exception used to report errors in use of Timer class"""
+
 
 @dataclass
 class Timer(ContextDecorator):

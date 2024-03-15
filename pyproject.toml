@@ -9,7 +9,7 @@ authors = [{name = "mathieu17g", email = "mathieu19g@icloud.com"}]
 description = "Inline line labels for matplotlib with automatic positionning"
 readme = "README.md"
 license = {file = "LICENSE"}
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 classifiers = [
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",

@@ -43,3 +43,4 @@ Misc
 ----
 - Code has been reformatted with a max line length of 92 for better readability
 - Github actions have been upgraded to last currently available versions
+- Dropped python 3.11 compatibility to be able to use hashable slices. Maybe retintroduced later if requested, provided more advanced multi-objective optimization is used in post-processing
