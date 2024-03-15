@@ -2,7 +2,7 @@
 ===============================================
 
 This release brings:
-- performance enhancement, x5 faster than previous release
+- performance enhancement, 20% to 50% faster than previous release
 - a better handling of closed curves 
 
 Algorithm
