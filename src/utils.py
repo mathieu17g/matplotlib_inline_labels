@@ -1,3 +1,4 @@
+from sys import version_info
 from functools import wraps
 from time import perf_counter
 
@@ -22,7 +23,10 @@ def timer(func):
 
 
 def esc(code):
-    return f'\033[{code}m'
+    if version_info < (3, 12, 0):
+        return ""
+    else:
+        return f'\033[{code}m'
 
 class TimerError(Exception):
     """A custom exception used to report errors in use of Timer class"""

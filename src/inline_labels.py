@@ -1,4 +1,3 @@
-from sys import version_info
 from utils import (
     # timer,
     esc,
@@ -343,16 +342,7 @@ def add_inline_labels(
 
     if debug:
         for k, v in Timer.timers.items():
-            if version_info < (3, 12, 0):
-                print("Elapsed time for " + k + f": {v:0.4f} seconds")
-            else:
-                print(
-                    "Elapsed time for "
-                    + esc("38;5;39")
-                    + k
-                    + esc(0)
-                    + f": {v:0.4f} seconds"
-                )
+            print("Elapsed time for " + esc("38;5;39") + k + esc(0) + f": {v:0.4f} seconds")
         return ax_data.get_figure()  # pyright: ignore[reportPossiblyUnboundVariable]
     else:
         return ax.get_figure()
