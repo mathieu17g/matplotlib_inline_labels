@@ -1,12 +1,13 @@
-`matplotlib_inline_labels` v0.2.0 Release Notes
-===============================================
+# `matplotlib_inline_labels` news
+
+## v0.2.0 Release Notes
 
 This release brings:
 - performance enhancement, 20% to 50% faster than previous release
 - a better handling of closed curves 
 
-Algorithm
----------
+### Algorithm
+---
 - **Pre-processing** stage of creating label position candidates has been enhanced with:
   - a safeguard on the number of candidates via `maxpos` arg preventing cases of low `ppf`, or small label `fontsize` or high figure `figsize` or a conjunction of all, to lead to too many unnecessary position candidates
   - handling of line self-intersections
@@ -24,8 +25,8 @@ Algorithm
   The use of more discrete separation levels or a move to continuous separation levels still has to be explored to see if it leads to better label inline placement
 - **Post-processing** stage has a draft algorithm using multi-objective optimization based on pymoo to enhance labels' position among themselves
 
-Code structure
---------------
+### Code structure
+---
 - Data structures have been refactored for better readability and put in a dedicated file `datatypes.py`
 - Functions of the main file `inline_labels.py` have been splitted in:
   - **drawing** (`drawing.py`): retrieval of matplotlib objects and creation of the visual debug figure
@@ -34,13 +35,14 @@ Code structure
   - **processing** (`processing.py`): identification of label rotation and separation
   - **post-processing** (`postprocessing.py`): selection of the best candidate for each line
 
-Utils
------
+### Utils
+---
 - Timers are available to show the cumulated time of functions. Timers can be set as decorators (to be added or uncommented) on a function that could be optimized
 - A timer decorator is available for the main function `add_inline_labels` for overall performance debug. It has to be uncommented to be used
 
-Misc
-----
+### Misc
+---
 - Code has been reformatted with a max line length of 92 for better readability
 - Github actions have been upgraded to last currently available versions
 - Dropped python 3.11 compatibility to be able to use hashable slices. Maybe retintroduced later if requested, provided more advanced multi-objective optimization is used in post-processing
+- Added a step in publish to pypi Github action to extract release notes from `NEWS.md`

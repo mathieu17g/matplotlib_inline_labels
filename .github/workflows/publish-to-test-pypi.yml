@@ -73,14 +73,20 @@ jobs:
         inputs: >-
           ./dist/*.tar.gz
           ./dist/*.whl
+    - name: Extract release notes
+      id: extract-release-notes
+      uses: ffurrer2/extract-release-notes@v2
+      with:
+        changelog_file: NEWS.md
     - name: Create GitHub Release
       env:
         GITHUB_TOKEN: ${{ github.token }}
+      run: gh release create --notes '${{ steps.extract-release-notes.outputs.release_notes }}' --title ${{ github.ref_name }} ${{ github.ref_name }}
       run: >-
         gh release create
         '${{ github.ref_name }}'
         --repo '${{ github.repository }}'
-        --notes ""
+        --notes '${{ steps.extract-release-notes.outputs.release_notes }}'
     - name: Upload artifact signatures to GitHub Release
       env:
         GITHUB_TOKEN: ${{ github.token }}
