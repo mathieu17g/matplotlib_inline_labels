@@ -17,7 +17,7 @@ fig, ax = plt.subplots()
 
 for a in A:
     Y = np.sin(a * X)
-    # Y[10*a:10*a*3] = np.nan
+    Y[100+5*a:100+5*a*3] = np.nan
     ax.plot(X, Y, label=f"Line {a}")
 
 fig_debug = add_inline_labels(ax, ppf=1.5, debug=True, fontsize="small")
