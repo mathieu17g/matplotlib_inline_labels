@@ -84,13 +84,19 @@ def get_axe_lines_geometries(
         )
 
         # Correct floating point imprecision for closed curves
-        if (
-            np.size(l_xydata_geom_coords) > 2
-            and isclose(l_xydata_geom_coords[0][0], l_xydata_geom_coords[-1][0])
-            and isclose(l_xydata_geom_coords[0][1], l_xydata_geom_coords[-1][1])
-        ):
-            l_xydata_geom_coords[-1][0] = l_xydata_geom_coords[0][0]
-            l_xydata_geom_coords[-1][1] = l_xydata_geom_coords[0][1]
+        unmasked_indices = np.nonzero(np.logical_not(l_xydata_geom_coords.mask))[0]
+        if np.size(unmasked_indices) >= 2:
+            first_um_ind = unmasked_indices[0]
+            last_um_ind = unmasked_indices[-1]
+            if isclose(
+                l_xydata_geom_coords[first_um_ind][0],
+                l_xydata_geom_coords[last_um_ind][0],
+            ) and isclose(
+                l_xydata_geom_coords[first_um_ind][1],
+                l_xydata_geom_coords[last_um_ind][1],
+            ):
+                l_xydata_geom_coords[last_um_ind][0] = l_xydata_geom_coords[first_um_ind][0]
+                l_xydata_geom_coords[last_um_ind][1] = l_xydata_geom_coords[first_um_ind][1]
 
         # Axe ax_geoms box in geometry coordinates, in a shape compatible with
         # shapely.clip_by_rect function
