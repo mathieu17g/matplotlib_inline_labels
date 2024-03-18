@@ -1,5 +1,19 @@
 # `matplotlib_inline_labels` news
 
+## v0.2.1 Release Notes
+
+TODO: add summary
+
+### Algorithm
+---
+- **Post-processing** stage has an enhanced choice in default algorithm in case of multiple longest sets of position and rotation adjacent candidates with same cardinality, the choosen candidate will be the one of the longest set in line coordinates
+
+### Bug fixes
+---
+- Fixed a bug in line geometric modeling at close curve detection stage: closed curves with hidden tails (`np.nan` values) were not properly detected
+- Fixed a bug in publish to pypi Github action: signing the dists with Sigstore was not working since `sigstore/gh-action-sigstore-python` version was not fully specified
+- Switched back to absolute links in `README.md` to have example images properly displayed on pypi project page (other branches have their `README.md` file pointing to wrong images, those of the main branch). It's still not ideal
+
 ## v0.2.0 Release Notes
 
 This release brings:
