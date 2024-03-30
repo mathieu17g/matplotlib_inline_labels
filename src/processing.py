@@ -184,7 +184,7 @@ def l_box_rot_check(
 # TODO: largest buffering factor
 
 
-# @Timer(name="get_sep")
+@Timer(name="get_sep")
 def get_sep(
     c: Point,
     rot: float,
@@ -274,7 +274,7 @@ def eval_rot(
 
     return new_rbs, new_min_align_err
 
-
+@Timer(name="filter_best_rotations")
 def filter_best_rotations(
     lc_LPmRc: list[Label_PmR],
     ld: Labelled_Lines_Geometric_Data_Dict,
@@ -343,7 +343,7 @@ def filter_best_rotations(
 
     return lc_Label_PRcs
 
-
+@Timer(name="evaluate_candidates")
 def evaluate_candidates(
     ld: Labelled_Lines_Geometric_Data_Dict,
     label: str,
