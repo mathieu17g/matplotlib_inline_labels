@@ -157,6 +157,7 @@ def test_precise_preprocessing_option_with_radius_lowering():
 
     fig_debug = add_inline_labels(
         ax,
+        ppf=0.5,
         preprocessing_curv_filter_mode="precise",
         fontsize="large",
     )
@@ -187,6 +188,7 @@ def test_precise_preprocessing_option_without_radius_lowering():
 
     fig_debug = add_inline_labels(
         ax,
+        ppf=0.5,
         preprocessing_curv_filter_mode="precise",
         fontsize="large",
     )
