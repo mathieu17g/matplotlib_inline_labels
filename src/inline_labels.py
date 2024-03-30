@@ -7,7 +7,7 @@ from datatypes import (
     Line_Chunk_Geometries,
     Label_Rotation_Estimates_Dict,
     Label_PRcs,
-    Labels_lcPRcs,
+    Labels_lcs_adjPRcs_groups,
     Labels_PRcs,
 )
 from drawing import (
@@ -81,7 +81,6 @@ def get_label_rotation_estimates(
 ######################################
 
 
-# @timer
 def add_inline_labels(
     ax: Axes,
     ppf: float = 1,  # Position precision factor
@@ -91,7 +90,6 @@ def add_inline_labels(
     overall_progress_desc: str = "Labels placement",
     with_perlabel_progress: bool = False,
     debug: bool = False,
-    fig_for_debug: Optional[Figure] = None,
     preprocessing_curv_filter_mode: Literal["fast", "precise"] = "fast",
     **l_text_kwarg,
 ) -> Optional[Figure]:
@@ -114,15 +112,78 @@ def add_inline_labels(
     - with_overall_progress: progress bar for whole axe's labels positionning
     - with_perlabel_progress: progress bar per label positionning
     - debug: draws a figure showing the algorithm intermediate results
-    - fig_for_debug: matplotlib figure for debugging view
     - **l_text_kwargs: text kwargs used for label drawing
 
     Returns: figure of the input Axe with labels drawn inline
     """
-
     # Reset debug timers
     for k in Timer.timers:
         Timer.timers[k] = 0.0
+
+    fig = _add_inline_labels(
+        ax,
+        ppf,
+        maxpos,
+        po,
+        with_overall_progress,
+        overall_progress_desc,
+        with_perlabel_progress,
+        debug,
+        preprocessing_curv_filter_mode,
+        **l_text_kwarg,
+    )
+    if debug:
+        print("Elapsed time for:")
+        for k, v in ((k, v) for k, v in Timer.timers.items() if k != "add_inline_labels"):
+            print("- " + esc(2) + esc("38;5;39") + k + esc(0) + f": {v:0.4f} seconds")
+        print(
+            "Total elapsed time for "
+            + esc(1)
+            + esc("38;5;39")
+            + "add_inline_labels"
+            + esc(0)
+            + f": {Timer.timers["add_inline_labels"]:0.4f} seconds"
+        )
+
+    return fig
+
+
+@Timer(name="add_inline_labels")
+def _add_inline_labels(
+    ax: Axes,
+    ppf: float = 1,  # Position precision factor
+    maxpos: int = 100,
+    po: Literal["default"] = "default",  # Placement algorithm option
+    with_overall_progress: bool = False,
+    overall_progress_desc: str = "Labels placement",
+    with_perlabel_progress: bool = False,
+    debug: bool = False,
+    preprocessing_curv_filter_mode: Literal["fast", "precise"] = "fast",
+    **l_text_kwarg,
+) -> Optional[Figure]:
+    """For an axe made of Line2D plots, draw the legend label for each line on it (centered
+    on one of its points) without any intersection with any other line or some of its own
+    missing data
+
+    WARNING: depending on the backend some overlapping errors may appear due to vector
+    drawing from a discrete resolution. Visual errors disapear when viewed on a real image
+    or by increasing the dpi.
+
+    Args:
+    - ax: Axe composed of Line2D objects
+    - ppf: position precision factor, fraction of the label box height, itself depending on
+    the font properties. This fraction of the label's box height is used as a sampling
+    distance along the line chunk to define candidates for label's bounding box's center
+    positionning
+    - maxpos: maximum label's position candidates before preprocessing. Should be stricly
+    positive
+    - with_overall_progress: progress bar for whole axe's labels positionning
+    - with_perlabel_progress: progress bar per label positionning
+    - debug: draws a figure showing the algorithm intermediate results
+    - **l_text_kwargs: text kwargs used for label drawing
+
+    Returns: figure of the input Axe with labels drawn inline
+    """
 
     # Draw the figure before anything else, #! Note that draw_idle is not enough
     # TODO: see if it can be detected that the figure has already been drawn in case of
@@ -130,17 +191,9 @@ def add_inline_labels(
     if (fig := ax.get_figure()) is not None:
         fig.canvas.draw()
 
-    # Nested progress bar does not work in every case => set overall and per label progress
-    # option mutually exclusive
-    if with_overall_progress and with_perlabel_progress:
-        raise ValueError(
-            f"Cannot use {with_overall_progress=} and {with_perlabel_progress=} since tqdm"
-            " nested progress bars does not always work depending on the environment"
-        )
-
     # Build a debug figure
     if debug:
-        ax_data, ax_geoms = get_dbg_axes(ax, fig_for_debug)
+        ax_data, ax_geoms = get_dbg_axes(ax)
 
     #############################
     # Retrieve lines and labels #
@@ -177,7 +230,7 @@ def add_inline_labels(
     ####################
 
     # Clustered and unclustered PR candidates structures initialization for label
-    graph_labels_lcPRcs = Labels_lcPRcs({})
+    graph_labels_lcs_adjPRcs_groups = Labels_lcs_adjPRcs_groups({})
     graph_labels_PRcs = Labels_PRcs({})
 
     ########################################################################
@@ -248,7 +301,7 @@ def add_inline_labels(
             # label line chunks boundaries
 
             # Clustered and unclustered PR candidates structures initialization for label
-            graph_labels_lcPRcs |= {label: list[Label_PRcs]([])}
+            graph_labels_lcs_adjPRcs_groups |= {label: dict[int, list[Label_PRcs]]({})}
             graph_labels_PRcs |= {label: Label_PRcs([])}
 
             # TODO: add an option to parallelize per line chunk computation for line chunk
@@ -265,21 +318,20 @@ def add_inline_labels(
                         lre,
                         get_lbox_geom,
                         debug,
-                        graph_labels_lcPRcs,
+                        graph_labels_lcs_adjPRcs_groups,
                         graph_labels_PRcs,
                         overall_pbar,
                     )
 
     # Draw visual debug
     if debug:
-        partial_ax_geoms_legend = plot_labels_PRcs(
+        plot_labels_PRcs(
             ax_geoms,  # pyright: ignore[reportPossiblyUnboundVariable]
             ld,
             graph_labels_PRcs,
             SEP_LEVELS,
         )
 
-    # TODO add progress info
     #############################
     # Find best label positions #
     #############################
@@ -287,17 +339,16 @@ def add_inline_labels(
     #! Default label best position algorithm: center of longuest contiguous label position
     #! candidates with the highest separation level found for earch line
     if po == "default":
-        lis, legend_labels = solselect_monocrit(linelikeLabels, graph_labels_lcPRcs, ld)
+        lis, legend_labels = solselect_monocrit(
+            linelikeLabels, graph_labels_lcs_adjPRcs_groups, ld
+        )
 
     # TODO: Add new algorithms
-    else:
-        raise ValueError("po (positionning option): must be one of 'default'")
 
     #############################
     # Draw label for each label #
     #############################
 
-    # ? split into non debug and debug version?
     if not debug:
         draw_inlined_labels(ax, l_text_kwarg, linelikeHandles, linelikeLabels, lis)
     else:
@@ -310,7 +361,7 @@ def add_inline_labels(
             linelikeLabels,
             data_linelikeHandles,  # pyright: ignore[reportPossiblyUnboundVariable]
             data_linelikeLabels,  # pyright: ignore[reportPossiblyUnboundVariable]
-            get_lbox_geom,  # pyright: ignore[reportPossiblyUnboundVariable]
+            ld,
             lis,
         )
 
@@ -319,7 +370,7 @@ def add_inline_labels(
 
     # Add legend with all labels than could not be positionned properly on their curve
     if legend_labels and debug:
-        warn(f"Unplaced labels : {legend_labels}")
+        print(f"Unplaced labels : {legend_labels}")
     if legend_labels and (len(legend_labels) != len(linelikeLabels)):
         if not debug:
             add_noninlined_labels_legend(
@@ -331,18 +382,14 @@ def add_inline_labels(
                 debug,
                 l_text_kwarg,
                 ax_data,  # pyright: ignore[reportPossiblyUnboundVariable]
-                ax_geoms,  # pyright: ignore[reportPossiblyUnboundVariable]
                 linelikeHandles,
                 linelikeLabels,
                 data_linelikeHandles,  # pyright: ignore[reportPossiblyUnboundVariable]
                 data_linelikeLabels,  # pyright: ignore[reportPossiblyUnboundVariable]
                 legend_labels,
-                partial_ax_geoms_legend,  # pyright: ignore[reportPossiblyUnboundVariable]
             )
 
     if debug:
-        for k, v in Timer.timers.items():
-            print("Elapsed time for " + esc('38;5;39') + k + esc(0) + f": {v:0.4f} seconds")
         return ax_data.get_figure()  # pyright: ignore[reportPossiblyUnboundVariable]
     else:
         return ax.get_figure()

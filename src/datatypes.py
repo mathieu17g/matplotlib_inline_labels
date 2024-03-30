@@ -30,9 +30,9 @@ class Line_Chunk_Geometries:
     - `re`: Rotation estimates for each candidates in radians
     """
 
-    lc: LineString | Point | None = None
+    lc: LineString | Point
     """Line chunk geometry"""
-    lcb: Polygon | None = None
+    lcb: Polygon
     """Line chunk buffered with Line2D width"""
     pcl: list[Point] = field(default_factory=list)
     """Label box center candidate list"""
@@ -102,8 +102,8 @@ Label_Rotation_Estimates_Dict = NewType(
 
 @dataclass
 class Rotation_Search_State:
-    """Mono direction label rotation angle search state. A valid rotation is when the 
-    label's bounding box has a good alignment with the current line chunk and does not 
+    """Mono direction label rotation angle search state. A valid rotation is when the
+    label's bounding box has a good alignment with the current line chunk and does not
     overlap with geometries other than the the current line chunk.
 
     Attributes:
@@ -220,10 +220,14 @@ class Label_PR:
     """Label's rotation"""
 
 
-Labels_lcPRcs = NewType("Labels_lcPRcs", dict[str, list[Label_PRcs]])
-"""List of labels' Postition and Rotation candidates clustered by:
-- line chunk
-- adjacency relatively to each sub line chunk (defined in preprocessing) sampling distance"""
+Labels_lcs_adjPRcs_groups = NewType(
+    "Labels_lcs_adjPRcs_groups", dict[str, dict[int, list[Label_PRcs]]]
+)
+"""Set of adjacent Postition and Rotation candidates clustered by:
+- label: refering to a `Labelled_Line_Geometric_Data` in the corresponding `Labelled_Lines_Geometric_Data_Dict`
+- line chunk index: refering to a  `Line_Chunk_Geometries` with the corresponding `Labelled_Line_Geometric_Data.lcgl` list
+- `Label_PRc` adjacencies relatively to each sub line chunk (defined in preprocessing) sampling distance
+"""
 
 Labels_PRcs = NewType("Labels_PRcs", dict[str, Label_PRcs])
 """Flat list of labels' Postition and Rotation candidates"""
@@ -243,3 +247,23 @@ Built on `dict[str, Label_PR]` with:
 - `cpt`: Label's center position 
 - `rot`: Label's rotation in radian
 """
+
+
+@dataclass
+class SepLongestSubgroups:
+    """Structure used to find the longest adjacent Postion and Rotation candidates sub group
+    on all a line chunk of a line for a particular separation level"""
+
+    card: int = -1
+    """Cardinality of the longest adjacent Postion and Rotation 
+    candidates for a particular separation level"""
+    length: float = -1
+    """Linear length along line chunk for the longest adjacent Postion and Rotation 
+    candidates for a particular separation level"""
+    sgd: dict[tuple[int, int], list[list[int]]] = field(
+        default_factory=lambda: dict[tuple[int, int], list[list[int]]]()
+    )
+    """Longest adjacent PRc subgroups indices (in line chunks' adjacent PRc groups indices), 
+    indexed by:
+    - line chunk index within `Line_Chunk_Geometries_List` of a `Labelled_Line_Geometric_Data`
+    - adjacent PRc subgroup (`Label_PRcs`) index within the line chunk's adjacent PRc subgroups list"""

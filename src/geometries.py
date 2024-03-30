@@ -8,8 +8,8 @@ from utils import Timer
 from matplotlib.transforms import Transform, Affine2D
 from matplotlib.axes import Axes
 from matplotlib.lines import Line2D
-from matplotlib.dates import date2num
-from typing import cast, Tuple
+#//from matplotlib.dates import date2num
+from typing import cast
 from nptyping import NDArray
 import shapely as shp
 import shapely.ops as shpops
@@ -27,7 +27,7 @@ def get_disp2geom_trans(ax: Axes) -> Transform:
 
 # TODO: split line geometries in line chunks in line chunks by difference with other
 # TODO: to avoid intersections from start
-# @Timer(name="get_axe_lines_geometries", logger=None)
+# @Timer(name="get_axe_lines_geometries")
 def get_axe_lines_geometries(
     ax: Axes,
     linelikeHandles: list[Line2D],
@@ -53,50 +53,50 @@ def get_axe_lines_geometries(
         ld[label] = Labelled_Line_Geometric_Data()
 
         # Get the x and y data from Line2D object
-        l_xdata_raw, l_ydata_raw = cast(tuple[NDArray, NDArray], h.get_data(orig=False))
+        X_raw, Y_raw = cast(tuple[NDArray, NDArray], h.get_data(orig=False))
 
-        # Check that x and y data are either of type float or datetime64.
-        # And if of type datetime64, converts it to float
-        if l_xdata_raw.dtype == np.datetime64:
-            # Convert x data from date_time to float
-            l_xdata_f = date2num(l_xdata_raw)
-        elif l_xdata_raw.dtype == np.dtype("float64"):
-            l_xdata_f = l_xdata_raw
-        else:
-            raise ValueError(
-                f"Line label: {label} has x data neither of type float or date, which is"
-                " not handle for now"
-            )
-        if l_ydata_raw.dtype == np.datetime64:
-            # Convert y data from date_time to float
-            l_ydata_f = date2num(l_ydata_raw)
-        elif l_ydata_raw.dtype == np.dtype("float64"):
-            l_ydata_f = l_ydata_raw
-        else:
-            raise ValueError(
-                f"Line label: {label} has y data neither of type float or date, which is"
-                " not handle for now"
-            )
-
-        # Convert from Data coordinates to Axes coordinates
-        l_xydata_geom_coords = ma.masked_invalid(
-            trans_data2geom.transform(np.c_[l_xdata_f, l_ydata_f])
+        # TODO: commented in version 2.1-dev -> to delete after some observation time
+        #// # Check that x and y data are either of type float or datetime64.
+        #// # And if of type datetime64, converts it to float
+        #// print(f"{X_raw.dtype=}")
+        #// if X_raw.dtype == np.datetime64:
+        #//     # Convert x data from date_time to float
+        #//     X_raw_float = date2num(X_raw)
+        #// elif X_raw.dtype == np.dtype("float64"):
+        #//     X_raw_float = X_raw
+        #// else:
+        #//     raise ValueError(
+        #//         f"Line label: {label} has x data neither of type float or date, which is"
+        #//         " not handle for now"
+        #//     )
+        #// if Y_raw.dtype == np.datetime64:
+        #//     # Convert y data from date_time to float
+        #//     Y_raw_float = date2num(Y_raw)
+        #// elif Y_raw.dtype == np.dtype("float64"):
+        #//     Y_raw_float = Y_raw
+        #// else:
+        #//     raise ValueError(
+        #//         f"Line label: {label} has y data neither of type float or date, which is"
+        #//         " not handle for now"
+        #//     )
+#//        # Convert from Data coordinates to Axes coordinates
+        #//XY_geom = ma.masked_invalid(
+        #//    trans_data2geom.transform(np.c_[X_raw_float, Y_raw_float])
+        #//)
+        XY_geom = ma.masked_invalid(
+            trans_data2geom.transform(np.c_[X_raw, Y_raw])
         )
 
         # Correct floating point imprecision for closed curves
-        unmasked_indices = np.nonzero(np.logical_not(l_xydata_geom_coords.mask))[0]
-        if np.size(unmasked_indices) >= 2:
-            first_um_ind = unmasked_indices[0]
-            last_um_ind = unmasked_indices[-1]
-            if isclose(
-                l_xydata_geom_coords[first_um_ind][0],
-                l_xydata_geom_coords[last_um_ind][0],
-            ) and isclose(
-                l_xydata_geom_coords[first_um_ind][1],
-                l_xydata_geom_coords[last_um_ind][1],
+        unmasked_inds = np.nonzero(np.logical_not(XY_geom.mask))[0]
+        if np.size(unmasked_inds) >= 2:
+            first_um_ind = unmasked_inds[0]
+            last_um_ind = unmasked_inds[-1]
+            if isclose(XY_geom[first_um_ind][0], XY_geom[last_um_ind][0]) and isclose(
+                XY_geom[first_um_ind][1], XY_geom[last_um_ind][1]
             ):
-                l_xydata_geom_coords[last_um_ind][0] = l_xydata_geom_coords[first_um_ind][0]
-                l_xydata_geom_coords[last_um_ind][1] = l_xydata_geom_coords[first_um_ind][1]
+                XY_geom[last_um_ind][0] = XY_geom[first_um_ind][0]
+                XY_geom[last_um_ind][1] = XY_geom[first_um_ind][1]
 
         # Axe ax_geoms box in geometry coordinates, in a shape compatible with
         # shapely.clip_by_rect function
@@ -105,7 +105,7 @@ def get_axe_lines_geometries(
         )
         shp.prepare(axe_box)
 
-        if (seqlen := len(ma.clump_unmasked(l_xydata_geom_coords[:, 1]))) > 1:
+        if (seqlen := len(ma.clump_unmasked(XY_geom[:, 1]))) > 1:
             if debug:
                 print(
                     f"Line {label} of Axe {ax.get_title()} is splitted in"
@@ -113,65 +113,70 @@ def get_axe_lines_geometries(
                 )
 
         # Create point or line chunk geometries for each continuous sequence of data points
-        for s in ma.clump_unmasked(l_xydata_geom_coords[:, 1]):
+        lcl = list[shp.Point | shp.LineString | shp.MultiLineString]([])
+        for s in ma.clump_unmasked(XY_geom[:, 1]):
             # Check if sequence of data points is reduced to one point, and create a Point
             # geometry. Point is clipped by Axe area
             if s.stop - s.start == 1:
-                lc = shp.intersection(
-                    shp.points(l_xydata_geom_coords[s.start].data), axe_box
-                )
+                geom = shp.intersection(shp.Point(XY_geom[s.start].data), axe_box)
             # Otherwise create a LineString geometry clipped by the Axe area
             else:
-                lc = shp.intersection(
-                    shp.linestrings(
-                        ma.compress_rows(l_xydata_geom_coords[s.start : s.stop])
-                    ),
+                geom = shp.intersection(
+                    shp.LineString(ma.compress_rows(XY_geom[s.start : s.stop])),
                     axe_box,
                 )
+            lcl.append(geom)
 
-                if not shp.is_empty(lc):
-                    # Split everything around intersections
-                    lc = shp.unary_union(lc)
+        # Split everything around self intersections
+        lgeoms = shp.unary_union(lcl)
 
-                    # Close the shapes
-                    # if shp.get_num_geometries(lc) > 1:
-                    polygons, cuts, dangles, invalid = shp.polygonize_full(
-                        shp.get_parts(lc)
-                    )
-                    # Check that there is no invalid linearring. There should not be any
-                    # since an unary_union has be done in the first place
-                    assert shp.is_empty(invalid)
-                    # Recover exteriors linearings from polygon(s) if any. LinearRings will
-                    # be converted to LineStrings by the final the final unary_union, but
-                    # with equal extremeties (used in preprocessing to recreate LinearRings)
-                    lrl = [p.exterior for p in polygons.geoms]
-                    # Line merge the rest
-                    lsl1 = [ls for ls in shp.get_parts(shpops.linemerge(cuts))]
-                    lsl2 = [ls for ls in shp.get_parts(shpops.linemerge(dangles))]
-                    lc = shp.unary_union(lrl + lsl1 + lsl2)
+        if not shp.is_empty(lgeoms):
+            # Extract point geometries
+            pt_geoms = shp.unary_union(
+                [g for g in shp.get_parts(lgeoms) if isinstance(g, shp.Point)]
+            )
+            ls_geoms = shp.unary_union(
+                [g for g in shp.get_parts(lgeoms) if not isinstance(g, shp.Point)]
+            )
 
-            # Add geometries to label's entry of the Plot_Labels_Geom_Data dict structure
-            if not shp.is_empty(lc):
-                if shp.get_num_geometries(lc) > 1:
-                    for lc_piece in lc.geoms:
-                        shp.prepare(lc_piece)
-                        lc_pieceb = shp.buffer(lc_piece, ld_lw[label] / 2)
-                        shp.prepare(lc_pieceb)
-                        ld[label].lcgl += [
-                            Line_Chunk_Geometries(lc=lc_piece, lcb=lc_pieceb)
-                        ]
-                else:
-                    shp.prepare(lc)
-                    lcb = shp.buffer(lc, ld_lw[label] / 2)
-                    shp.prepare(lcb)
-                    ld[label].lcgl += [Line_Chunk_Geometries(lc=lc, lcb=lcb)]
+            if not shp.is_empty(ls_geoms):
+                # Close all that can be on the rest
+                polygons, cuts, dangles, invalid = shp.polygonize_full(
+                    shp.get_parts(ls_geoms)
+                )
+                # Check that there is no invalid linearring. There should not be any
+                # since an unary_union has be done in the first place
+                assert shp.is_empty(invalid)
+
+                # Recover exteriors linearings from polygon(s) if any. LinearRings will
+                # be converted to LineStrings by the final the final unary_union, but
+                # with equal extremeties (used in preprocessing to recreate LinearRings)
+                lrl = [p.exterior for p in polygons.geoms]
+                # Line merge the rest
+                lsl1 = [ls for ls in shp.get_parts(shpops.linemerge(cuts))]
+                lsl2 = [ls for ls in shp.get_parts(shpops.linemerge(dangles))]
+                ls_geoms = shp.unary_union(lrl + lsl1 + lsl2)
+
+            for geoms in [pt_geoms, ls_geoms]:
+                # Add geometries to label's entry of the Plot_Labels_Geom_Data dict structure
+                if not shp.is_empty(geoms):
+                    if shp.get_num_geometries(geoms) > 1:
+                        for g in geoms.geoms:
+                            shp.prepare(g)
+                            gb = shp.buffer(g, ld_lw[label] / 2)
+                            shp.prepare(gb)
+                            ld[label].lcgl += [Line_Chunk_Geometries(lc=g, lcb=gb)]
+                    else:
+                        shp.prepare(geoms)
+                        gb = shp.buffer(geoms, ld_lw[label] / 2)
+                        shp.prepare(gb)
+                        ld[label].lcgl += [Line_Chunk_Geometries(lc=geoms, lcb=gb)]
 
     return ld
 
 
 # TODO: see if blitting could help to speed up redrawing needed to get label boxes dimensions
-# @timer
-@Timer(name="update_ld_with_label_text_box_dimensions", logger=None)
+@Timer(name="update_ld_with_label_text_box_dimensions")
 def update_ld_with_label_text_box_dimensions(
     ax: Axes,
     linelikeHandles: list[Line2D],
@@ -179,7 +184,7 @@ def update_ld_with_label_text_box_dimensions(
     ld: Labelled_Lines_Geometric_Data_Dict,
     label: str,
     **label_text_kwarg,
-) -> Tuple[float, float]:
+) -> tuple[float, float]:
     """Updates line data structure with text label box dimensions
 
     Returns: <box width> and <box height>

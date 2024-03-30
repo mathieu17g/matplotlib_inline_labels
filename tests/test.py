@@ -6,13 +6,63 @@ from datetime import datetime
 from matplotlib.dates import UTC, DateFormatter, DayLocator
 from matplotlib.gridspec import GridSpec, GridSpecFromSubplotSpec
 from scipy.stats import loglaplace, chi2
-from warnings import catch_warnings
 
 import os
 import sys
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
 from inline_labels import add_inline_labels
+
+
+# %%
+@pytest.mark.mpl_image_compare(style="default", savefig_kwargs={"bbox_inches": "tight"})
+def test_multiple_subplots_with_gridspec():
+    X = np.linspace(0, 1, 500)
+    A = [1, 2, 5, 10, 20]
+    with plt.style.context("fivethirtyeight"):
+        fig = plt.figure(tight_layout=True, dpi=300, figsize=(20, 15))
+        gsc = GridSpec(
+            3, 1, figure=fig, height_ratios=[1, 0.5, 1.5]
+        )  # Gridspec with column of n lines
+        gsl = []  # Initialize line subgridspec list
+        axs = []  # Initialize axe list on vertical dimension
+        for i in range(3):
+            # Add to subgridspec list, gridspec for i-th line
+            gsl.append(
+                GridSpecFromSubplotSpec(
+                    1, 3, subplot_spec=gsc[i], width_ratios=[1, 0.5, 1.5]
+                )
+            )
+            # Add 2nd horizontal dimension to the axe list
+            axs.append([])
+            for j in range(3):
+                axs[i].append(fig.add_subplot(gsl[i][0, j]))
+                for a in A:
+                    axs[i][j].semilogx(
+                        X,
+                        chi2(5).pdf(a * X),  # pyright: ignore[reportAttributeAccessIssue]
+                        label=f"{a=}",
+                    )
+                # Add axe title
+                axs[i][j].set_title(f"Graph[{i+1}][{j+1}]")
+                # Y-axis label on fist plot of each row only
+                if j == 0:
+                    axs[i][j].set_ylabel("Y=chi2(5).pdf(aX) with\na in [1, 2, 5, 10, 20]")
+                # For second colum set y max to 0.2
+                if j == 1:
+                    axs[i][j].set_ylim(top=0.2)
+                # For third colum set y max to 0.1
+                if j == 2:
+                    axs[i][j].set_ylim(top=0.1)
+
+        for i in range(3):
+            for j in range(3):
+                add_inline_labels(axs[i][j], with_overall_progress=True)
+
+    return fig
+
+
+# _ = test_multiple_subplots_with_gridspec()
 
 
 # %%
@@ -25,6 +75,39 @@ def test_linspace():
         plt.plot(x, np.sin(k * x), label=rf"$f(x)=\sin({k} x)$")
 
     add_inline_labels(plt.gca())
+    plt.xlabel("$x$")
+    plt.ylabel("$f(x)$")
+    return plt.gcf()
+
+
+# _ = test_linspace()
+# %%
+@pytest.mark.mpl_image_compare(style="default", savefig_kwargs={"bbox_inches": "tight"})
+def test_warning_for_nolabels():
+    x = np.linspace(0, 1)
+    K = [1, 2, 4]
+
+    for k in K:
+        plt.plot(x, np.sin(k * x))
+
+    with pytest.warns(UserWarning, match="No line like object with label set"):
+        add_inline_labels(plt.gca())
+    plt.xlabel("$x$")
+    plt.ylabel("$f(x)$")
+    return plt.gcf()
+
+
+# _ = test_linspace()
+# %%
+@pytest.mark.mpl_image_compare(style="default", savefig_kwargs={"bbox_inches": "tight"})
+def test_with_overall_and_perlabel_progress_bars():
+    x = np.linspace(0, 1)
+    K = [1, 2, 4]
+
+    for k in K:
+        plt.plot(x, np.sin(k * x), label=rf"$f(x)=\sin({k} x)$")
+
+    add_inline_labels(plt.gca(), with_overall_progress=True, with_perlabel_progress=True)
     plt.xlabel("$x$")
     plt.ylabel("$f(x)$")
     return plt.gcf()
@@ -50,6 +133,68 @@ def test_linspace_with_visualdebug():
 
 
 # _ = test_linspace_with_visualdebug()
+
+
+# %%
+@pytest.mark.mpl_image_compare(style="default", savefig_kwargs={"bbox_inches": "tight"})
+def test_precise_preprocessing_option_with_radius_lowering():
+    X = np.linspace(0, 1, 1000)
+    A = [1, 2, 5, 10, 20]
+
+    fig, ax = plt.subplots()  # figsize=(96, 64))
+
+    for a in A:
+        Y = np.sin(a * X)
+        # Shortening of last curve to cut it just after a high curvature point, enables to 
+        # to hit the code handling the case where there is one position candidate for which
+        # the circle centered on it and of radius label's bounding box half diagonal does 
+        # not intersects the curve but the circle of radius label's bounding box half width
+        # does. Therefore enabling to use the maximum radius between the two radii, 
+        # intersecting the curve
+        if a == 20:
+            Y[90:-1] = np.nan
+        ax.plot(X, Y, label=f"T{a}")
+
+    fig_debug = add_inline_labels(
+        ax,
+        preprocessing_curv_filter_mode="precise",
+        fontsize="large",
+    )
+
+    return fig_debug
+
+
+# _ = test_precise_preprocessing_option()
+
+# %%
+@pytest.mark.mpl_image_compare(style="default", savefig_kwargs={"bbox_inches": "tight"})
+def test_precise_preprocessing_option_without_radius_lowering():
+    X = np.linspace(0, 1, 1000)
+    A = [1, 2, 5, 10, 20]
+
+    fig, ax = plt.subplots()  # figsize=(96, 64))
+
+    for a in A:
+        Y = np.sin(a * X)
+        # Shortening of last curve to cut it just after a high curvature point, enables to 
+        # to hit the code handling the case where there is one position candidate for which
+        # the ring between the circle centered on it and of radius label's bounding box half
+        # diagonal and the circle of radius label's bounding box half width does not
+        # intersect the curve on one side
+        if a == 20:
+            Y[100:-1] = np.nan
+        ax.plot(X, Y, label=f"T{a}")
+
+    fig_debug = add_inline_labels(
+        ax,
+        preprocessing_curv_filter_mode="precise",
+        fontsize="large",
+    )
+
+    return fig_debug
+
+
+# _ = test_precise_preprocessing_option()
 
 
 # %%
@@ -344,7 +489,10 @@ def test_errorbar_with_list():
 
 # %%
 @pytest.mark.skip(
-    reason="For a Line 2D built with axhline, x data coordinates are in Axes coordinates. Cannot figure how to identify it among the Line2D of an Axes"
+    reason=(
+        "For a Line 2D built with axhline, x data coordinates are in Axes coordinates."
+        " Cannot figure how to identify it among the Line2D of an Axes"
+    )
 )
 @pytest.mark.mpl_image_compare(style="default", savefig_kwargs={"bbox_inches": "tight"})
 def test_labeling_axhline():
@@ -352,53 +500,11 @@ def test_labeling_axhline():
     ax.plot([10, 12, 13], [1, 2, 3], label="plot")
     ax.axhline(y=2, label="axhline")
     # print(f"{ax.get_lines()[1].get_data()=}") #! x data returned in Axes coordinates
-    add_inline_labels(plt.gca(), debug=True, fig_for_debug=plt.gcf())
-    return fig
+    fig_for_debug = add_inline_labels(plt.gca(), debug=True)
+    return fig_for_debug
 
 
 # _ = test_labeling_axhline()
-
-
-# %%
-@pytest.mark.mpl_image_compare(style="default", savefig_kwargs={"bbox_inches": "tight"})
-def test_unplaced_labels_without_warning():
-    #! Necessary to specify a figsize on linux, otherwise baseline generated image different from test output image
-    plt.subplots(figsize=(6.4, 4.8))
-    X = np.linspace(0, 1, 500)
-    A = [1, 2, 5, 10, 20]
-    for a in A:
-        plt.plot(
-            X,
-            loglaplace(4).pdf(a * X),  # pyright: ignore[reportAttributeAccessIssue]
-            label=f"Line {a}",
-        )
-    with catch_warnings():
-        add_inline_labels(plt.gca(), fontsize="x-large")
-    return plt.gcf()
-
-
-# _ = test_unplaced_labels_without_warning()
-
-
-# %%
-@pytest.mark.mpl_image_compare(style="default", savefig_kwargs={"bbox_inches": "tight"})
-def test_unplaced_labels_with_warning():
-    #! Necessary to specify a figsize on linux, otherwise baseline generated image different from test output image
-    plt.subplots(figsize=(6.4, 4.8))
-    X = np.linspace(0, 1, 500)
-    A = [1, 2, 5, 10, 20]
-    for a in A:
-        plt.plot(
-            X,
-            loglaplace(4).pdf(a * X),  # pyright: ignore[reportAttributeAccessIssue]
-            label=f"Line {a}",
-        )
-    with pytest.warns(UserWarning):
-        add_inline_labels(plt.gca(), debug=True, fontsize="x-large")
-    return plt.gcf()
-
-
-# _ = test_unplaced_labels_with_warning()
 
 
 # %%
@@ -476,56 +582,6 @@ def test_fig_correctly_drawn_before_finding_label_placement():
 # _ = test_fig_correctly_drawn_before_finding_label_placement()
 
 
-# %%
-@pytest.mark.mpl_image_compare(style="default", savefig_kwargs={"bbox_inches": "tight"})
-def test_multiple_subplots_with_gridspec():
-    X = np.linspace(0, 1, 500)
-    A = [1, 2, 5, 10, 20]
-    with plt.style.context("fivethirtyeight"):
-        fig = plt.figure(tight_layout=True, dpi=300, figsize=(20, 15))
-        gsc = GridSpec(
-            3, 1, figure=fig, height_ratios=[1, 0.5, 1.5]
-        )  # Gridspec with column of n lines
-        gsl = []  # Initialize line subgridspec list
-        axs = []  # Initialize axe list on vertical dimension
-        for i in range(3):
-            # Add to subgridspec list, gridspec for i-th line
-            gsl.append(
-                GridSpecFromSubplotSpec(
-                    1, 3, subplot_spec=gsc[i], width_ratios=[1, 0.5, 1.5]
-                )
-            )
-            # Add 2nd horizontal dimension to the axe list
-            axs.append([])
-            for j in range(3):
-                axs[i].append(fig.add_subplot(gsl[i][0, j]))
-                for a in A:
-                    axs[i][j].semilogx(
-                        X,
-                        chi2(5).pdf(a * X),  # pyright: ignore[reportAttributeAccessIssue]
-                        label=f"{a=}",
-                    )
-                # Add axe title
-                axs[i][j].set_title(f"Graph[{i+1}][{j+1}]")
-                # Y-axis label on fist plot of each row only
-                if j == 0:
-                    axs[i][j].set_ylabel("Y=chi2(5).pdf(aX) with\na in [1, 2, 5, 10, 20]")
-                # For second colum set y max to 0.2
-                if j == 1:
-                    axs[i][j].set_ylim(top=0.2)
-                # For third colum set y max to 0.1
-                if j == 2:
-                    axs[i][j].set_ylim(top=0.1)
-
-        for i in range(3):
-            for j in range(3):
-                add_inline_labels(axs[i][j])
-
-    return fig
-
-
-# _ = test_multiple_subplots_with_gridspec()
-
 # %% Lemniscates
 @pytest.mark.mpl_image_compare(style="default", savefig_kwargs={"bbox_inches": "tight"})
 def test_closed_curves_lemniscates():
@@ -543,7 +599,100 @@ def test_closed_curves_lemniscates():
 
     return fig
 
+
 # _ = test_closed_curves_lemniscates()
+
+
+# %% Lemniscates with 1 gap
+@pytest.mark.mpl_image_compare(style="default", savefig_kwargs={"bbox_inches": "tight"})
+def test_closed_curves_lemniscates_with_1_gap():
+    fig, ax = plt.subplots()
+
+    A = [1, 2, 5, 10, 20]
+    t = np.linspace(0, 2 * np.pi, num=1000)
+
+    for a in A:
+        X = np.log10(a) / 10 + np.log10(a) * np.cos(t) / (np.sin(t) ** 2 + 1)
+        Y = np.log10(a) / 10 + np.log10(a) * np.cos(t) * np.sin(t) / (np.sin(t) ** 2 + 1)
+        Y[50:110] = np.nan
+        ax.plot(X, Y, label=f"lem {a}")
+
+    fig_for_debug = add_inline_labels(ax, debug=True, fontsize="medium")
+
+    return fig_for_debug
+
+
+# _ = test_closed_curves_lemniscates()
+
+
+# %% Lemniscates with 2 gaps
+@pytest.mark.mpl_image_compare(style="default", savefig_kwargs={"bbox_inches": "tight"})
+def test_closed_curves_lemniscates_with_2_gaps():
+    fig, ax = plt.subplots()
+
+    A = [1, 2, 5, 10, 20]
+    t = np.linspace(0, 2 * np.pi, num=1000)
+
+    for a in A:
+        X = np.log10(a) / 10 + np.log10(a) * np.cos(t) / (np.sin(t) ** 2 + 1)
+        Y = np.log10(a) / 10 + np.log10(a) * np.cos(t) * np.sin(t) / (np.sin(t) ** 2 + 1)
+        Y[50:110] = np.nan
+        Y[505:530] = np.nan
+        ax.plot(X, Y, label=f"lem {a}")
+
+    fig_for_debug = add_inline_labels(ax, debug=True, fontsize="medium")
+
+    return fig_for_debug
+
+
+# _ = test_closed_curves_lemniscates()
+
+
+# %% Lemniscates with 3 gaps and an isolated point
+@pytest.mark.mpl_image_compare(style="default", savefig_kwargs={"bbox_inches": "tight"})
+def test_closed_curves_lemniscates_with_3_gaps_and_an_isolated_point():
+    fig, ax = plt.subplots()
+
+    A = [1, 2, 5, 10, 20]
+    t = np.linspace(0, 2 * np.pi, num=1000)
+
+    for a in A:
+        X = np.log10(a) / 10 + np.log10(a) * np.cos(t) / (np.sin(t) ** 2 + 1)
+        Y = np.log10(a) / 10 + np.log10(a) * np.cos(t) * np.sin(t) / (np.sin(t) ** 2 + 1)
+        Y[50:70] = np.nan
+        Y[71:110] = np.nan
+        Y[505:530] = np.nan
+        ax.plot(X, Y, label=f"lem {a}")
+        if a != 1:
+            ax.scatter(
+                X[70],
+                Y[70],
+                s=100,
+                label="isolated point",
+                facecolor="none",
+                edgecolor="black",
+            )
+            annotation_text = "isolated points\non the curve" if a == 2 else ""
+            ax.annotate(
+                annotation_text,
+                xy=(X[70], Y[70]),
+                xycoords="data",
+                xytext=(0.55, 0.9),
+                textcoords="axes fraction",
+                arrowprops=dict(
+                    facecolor="black", width=1, headwidth=5, headlength=10, shrink=0.1
+                ),
+                horizontalalignment="right",
+                verticalalignment="bottom",
+            )
+
+    add_inline_labels(ax, fontsize="medium")
+
+    return fig
+
+
+# _ = test_closed_curves_lemniscates()
+
 
 # %% Almost touching circles
 @pytest.mark.mpl_image_compare(style="default", savefig_kwargs={"bbox_inches": "tight"})
@@ -561,10 +710,12 @@ def test_closed_curves_almost_touching_circles():
     ax.set_aspect("equal", adjustable="box")
 
     add_inline_labels(ax, fontsize="small")
-    
+
     return fig
 
+
 # _ = test_closed_curves_almost_touching_circles()
+
 
 # %% Well separated circles
 @pytest.mark.mpl_image_compare(style="default", savefig_kwargs={"bbox_inches": "tight"})
@@ -585,5 +736,6 @@ def test_closed_curves_well_separeted_circles():
     add_inline_labels(ax, fontsize="small")
 
     return fig
+
 
 # _ = test_closed_curves_well_separeted_circles()

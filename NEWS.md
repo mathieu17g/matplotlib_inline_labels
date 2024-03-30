@@ -1,18 +1,38 @@
 # `matplotlib_inline_labels` news
 
 ## v0.2.1 Release Notes
-
-TODO: add summary
+This realase brings:
+- Performance enhancement **To be evaluated**
+- Bug fixes
+- Test enhancements
 
 ### Algorithm
 ---
-- **Post-processing** stage has an enhanced choice in default algorithm in case of multiple longest sets of position and rotation adjacent candidates with same cardinality, the choosen candidate will be the one of the longest set in line coordinates
+- **Post-processing** stage has an enhanced choice in the default algorithm. 
+  - When looking for the longest group of position and rotation adjacent candidates, instead of choosing the first longest group based on cardinality, now we choose among groups of highest cardinality the one with the longest distance on line chunk measured between its extremities. In the improbable case where there would still be several (e.g. highest cardinality groups all with only one candidate), the first one is chosen. 
+  
+    Two dedicated data structures `Labels_lcs_adjPRcs_groups` and `SepLongestSubgroups` have been introduced for the latter purpose, and `Labels_lcPRcs` has been removed
+- **Trailing TODO**
+  - **Processing**: Optimize the function giving the label's bounding box rotated and translated geometry, and its usage 
+  - **Processing and post-processing**: use of more discrete separation levels or a move to continuous separation levels
+  - **Post-processing**: use multi-objective optimization based on pymoo to enhance labels' position among themselves
+  - **Post-processing**: handle the case where two labels overlap because the highest separation level found, is 0 on the two corresponding lines. This will be handled after multi-objective optimization implementation
+
+
+### Misc
+---
+- Added the usage of `pytest-xdist` to speed up testing in GitHub actions CI, through parallelization
+- Enhanced test coverage
 
 ### Bug fixes
 ---
-- Fixed a bug in line geometric modeling at close curve detection stage: closed curves with hidden tails (`np.nan` values) were not properly detected
+- Fixed a bug in line geometric modeling at the closed curve detection stage: closed curves with hidden tails (`np.nan` values) were not properly detected
 - Fixed a bug in publish to pypi Github action: signing the dists with Sigstore was not working since `sigstore/gh-action-sigstore-python` version was not fully specified
-- Switched back to absolute links in `README.md` to have example images properly displayed on pypi project page (other branches have their `README.md` file pointing to wrong images, those of the main branch). It's still not ideal
+- Switched back to absolute links in `README.md` to have example images properly displayed on pypi project page (other branches have their `README.md` file pointing to the wrong images, those of the main branch). It's still not ideal
+- Fixed a bug on labels' bounding box dimensions on visual debug figure. Dimension of the last label processed was used for all labels instead of using each label's bounding box dimension
+- Fixed a bug preventing to show visual debug figure legend when all labels could be inlined
+- Fixed the minimum number of label's center position candidates to be 3 instead of 4
+- Fixed the line chunks polygonization at the geometry extraction stage, by applying the polygonization to the union of all continuous non `nan` data segments instead of to each one separately 
 
 ## v0.2.0 Release Notes
 

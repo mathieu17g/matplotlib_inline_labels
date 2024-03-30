@@ -9,7 +9,6 @@ import math
 from shapely import GeometryType as GT
 import numpy.typing as npt
 from nptyping import NDArray, Shape, Object
-from warnings import warn
 from math import isclose
 
 
@@ -26,7 +25,7 @@ def pt_approx_buffer(pt: shp.Geometry, precision: int = 4) -> shp.Geometry:
 
 # TODO2: if reused elsewhere, add in line chunk geometries, the (unary) union of all other
 # TODO2: line chunks
-@Timer(name="update_ld_with_label_position_candidates", logger=None)
+@Timer(name="update_ld_with_label_position_candidates")
 def update_ld_with_label_position_candidates(
     ppf: float,
     ld: Labelled_Lines_Geometric_Data_Dict,
@@ -55,12 +54,12 @@ def update_ld_with_label_position_candidates(
     5. Filter points which are in a too high curvatures areas
 
     Args:
-    - ppf: position precision factor, which is used as a fraction of the label box height 
+    - ppf: position precision factor, which is used as a fraction of the label box height
     for line chunks sampling
     - ld: labels' geometric data
     - label: current label
     - maxpos: maximum label's position candidates before preprocessing
-    - curv_filter_mode: the curvature estimation mode for filtering label's position 
+    - curv_filter_mode: the curvature estimation mode for filtering label's position
     candidates which lies on a too high curvature part
     """
 
@@ -88,18 +87,12 @@ def update_ld_with_label_position_candidates(
     for lc_idx, lcg in enumerate(ld[label].lcgl):
         lc = lcg.lc
         #! Filter line chunks too short to accomodate a proper label placement
-        if lc is None:
-            continue
         if shp.get_type_id(lc) == GT.POINT:
             # Don't try to put the label on line chunks reduced to a single point and leave
             # line chunk center candidates' list empty (default value)
             continue
-        if shp.get_type_id(lc) != GT.LINESTRING:
-            raise ValueError(
-                "Geometry collection contains a geometric object which is not either a"
-                " Point or a LineString"
-            )
-        if shp.get_type_id(lc) != GT.LINESTRING and shp.length(lc) <= lbox_hp:
+        assert shp.get_type_id(lc) == GT.LINESTRING
+        if shp.length(lc) <= lbox_hp:
             # Don't try to put label on line chunks of size inferior to label's box width
             # + height and leave line chunk's center candidates' list empty (default value)
             continue
@@ -151,12 +144,7 @@ def update_ld_with_label_position_candidates(
         for slc in slcl:
             #! Sample each sub line chunk with a distance of the label's bounding box's
             #! heigh multiplied by the position precision factor: ppf
-            if shp.get_type_id(slc) != GT.LINESTRING:
-                raise Exception(
-                    "A line chunk part, after splitting around self intersections and"
-                    " intersections with other line chunks, is different from a LineString."
-                    " Please report the case through an issue"
-                )
+            assert shp.get_type_id(slc) == GT.LINESTRING
 
             # Create a set of points along the sub line chunk separated by the previously
             # defined center distance unit for the current label's box geometry
@@ -173,16 +161,17 @@ def update_ld_with_label_position_candidates(
                 # ? ensure that the number of distance samples is odd
                 # Adjust sampling distance to be an integer fraction of the sub line chunk's
                 # length - minus label's box's half perimeter
-                n = max(int((shp.length(slc) - lbox_hp) / lbox_sd), 3)
+                n = max(int((shp.length(slc) - lbox_hp) / lbox_sd), 2)
                 fit_sd = (shp.length(slc) - lbox_hp) / n
                 # Distance samples along sub line chunk list
                 d_smpls = [i * fit_sd + lbox_hp / 2 for i in range(n + 1)]
             slc_Pcl = shp.line_interpolate_point(slc, d_smpls)
 
             # Remove the last element if it coincides with the right boundary point,
-            if slc_Pcl.size and shp.length(slc) % lbox_sd == 0.0:
-                warn("Last element of the candidates list deleted")
-                del slc_Pcl[-1]
+            if slc_Pcl.size:
+                assert shp.length(slc) % lbox_sd != 0.0
+                # //warn("Last element of the candidates list deleted")
+                # //del slc_Pcl[-1]
 
             # Make some verifications on the two end candidates
             if slc_Pcl.size:
@@ -206,18 +195,18 @@ def update_ld_with_label_position_candidates(
                             shp.line_interpolate_point(slc, shp.length(slc) - lbox_hp / 2)
                         ),
                     )
-            else:
-                # Check that two end points are separated by a linear distance equal to the
-                # sampling distance
-                assert isclose(
-                    (
-                        shp.length(slc)
-                        - shp.line_locate_point(slc, slc_Pcl[-1])
-                        + shp.line_locate_point(slc, slc_Pcl[0])
-                    ),
-                    fit_sd,
-                    rel_tol=1e-2,
-                )
+                else:
+                    # Check that two end points are separated by a linear distance equal to
+                    # the sampling distance
+                    assert isclose(
+                        (
+                            shp.length(slc)
+                            - shp.line_locate_point(slc, slc_Pcl[-1])
+                            + shp.line_locate_point(slc, slc_Pcl[0])
+                        ),
+                        fit_sd,
+                        rel_tol=1e-2,
+                    )
 
             if slc_Pcl.size:
                 #! Filter points for which the circle, of radius half box height,
@@ -229,16 +218,12 @@ def update_ld_with_label_position_candidates(
                     2,
                 )
                 slc_Pcl = slc_Pcl[mask]
-            else:
-                continue
 
             if slc_Pcl.size:
                 #! Filter points which are closer to aog than label's box half height
                 bl_slc_Pcl = shp.buffer(slc_Pcl, ld[label].boxd.h / 2)
                 mask = np.logical_not(shp.intersects(bl_slc_Pcl, aog))
                 slc_Pcl = slc_Pcl[mask]
-            else:
-                continue
 
             if slc_Pcl.size:
                 #! Filter points for which the circle of radius equal to the label's box
@@ -316,8 +301,6 @@ def update_ld_with_label_position_candidates(
                     # to filter on an estimated curvature
                     if slc_Pcl.size:
                         rot_estimates = segments_angles(list(ipts_diag[mask]))
-                else:
-                    raise ValueError("'curv_filter_mode' should be 'fast' or 'precise'")
 
             else:
                 continue
@@ -344,8 +327,9 @@ def segments_angles(pts: list[npt.NDArray[shp.Point]]) -> list[float]:
     # Convert angles in [0, pi] to [-pi/2, pi/2]
     pts_angs = pts_angs_modpi - np.pi * (pts_angs_modpi > (np.pi / 2))
 
-    if not (np.all(pts_angs >= (-np.pi / 2)) and np.all(pts_angs <= (np.pi / 2))):
-        raise Exception("Angles beyond right half plan")
+    assert np.all(pts_angs >= (-np.pi / 2)) and np.all(
+        pts_angs <= (np.pi / 2)
+    ), "Angles beyond right half plan"
 
     return list(pts_angs)
 
@@ -356,8 +340,7 @@ def nonempty_ipt(pts: npt.NDArray[shp.Point]) -> shp.Point:
     return pts[idx]
 
 
-# @timer
-# @Timer(name="circles_on_line_closest_biintersections", logger=None)
+# @Timer(name="circles_on_line_closest_biintersections")
 def circles_on_line_closest_biintersections(
     R: float,
     LS: shp.LineString,
@@ -365,9 +348,9 @@ def circles_on_line_closest_biintersections(
     min_R: float | None = None,
     mode: Literal["fast", "precise"] = "fast",
 ) -> NDArray[Shape["*"], Object]:  # noqa: F722
-    """Given a linestring and an array of points on this line, returns an array of, for each
-    point P, an array of the closest intersection points on either sides of point P, between
-    the linestring and the circle of radius R centered on point P.
+    """Given a linestring LS and an array of points P on this line, returns an array of, for
+    each point P, an array of the closest intersection points on either sides of point P, 
+    between the linestring and the circle of radius R centered on point P.
 
     If for a point P, the circle of radius R does not intersect the linestring on one side
     of P, returns the closest point of the intersection between the correponding
@@ -485,9 +468,6 @@ def circles_on_line_closest_biintersections(
 
             assert all([np.size(ipt) <= 2 for ipt in iPs])
 
-    else:
-        raise ValueError("'mode' should be 'fast' or 'precise'")
-
     return iPs
 
 
@@ -508,26 +488,24 @@ def choose_closest_intersection(
     return sideIs
 
 
-# @Timer(name="cut", logger=None)
+# @Timer(name="cut")
 def cut(LS, Ps):
-    if isinstance(LS, shp.LineString):
-        buffer_size = max(
-            1.1 * max(np.vectorize(lambda p: shp.distance(LS, p))(Ps)),
-            shp.length(LS) * 1e-4,
-        )
-        shp.prepare(LS)
-        assert np.all(shp.intersects(LS, shp.buffer(Ps, buffer_size)))
-        return np.vectorize(shp.get_parts)(
-            np.vectorize(lambda b: shp.difference(LS, b))(shp.buffer(Ps, buffer_size))
-        )
-    else:
-        raise Exception(
-            "Trying to cut a geometry which is not a LineString. Please report the case"
-            " through an issue"
-        )
+    assert isinstance(LS, shp.LineString), (
+        "Trying to cut a geometry which is not a LineString. Please report the case through"
+        " an issue"
+    )
+    buffer_size = max(
+        1.1 * max(np.vectorize(lambda p: shp.distance(LS, p))(Ps)),
+        shp.length(LS) * 1e-4,
+    )
+    shp.prepare(LS)
+    assert np.all(shp.intersects(LS, shp.buffer(Ps, buffer_size)))
+    return np.vectorize(shp.get_parts)(
+        np.vectorize(lambda b: shp.difference(LS, b))(shp.buffer(Ps, buffer_size))
+    )
 
 
-# @Timer(name="try_a_lower_radius", logger=None)
+# @Timer(name="try_a_lower_radius")
 def try_a_lower_radius(
     R: float,
     Ps: npt.NDArray[shp.Point],
@@ -568,7 +546,7 @@ def try_a_lower_radius(
                 intersections,
                 dtype=object,
             ) / shp.length(segments)
-            # Filter null lengths, correponding to interserctions reduced to a point
+            # Filter null lengths, correponding to intersections reduced to a point
             nonnull_normalized_lengths = filter(len, normalized_lengths)
             # Densifying ratio for haussdorf distance chosen as the smallest
             densifying_ratio = min(

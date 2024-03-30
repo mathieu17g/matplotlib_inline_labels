@@ -1,22 +1,22 @@
-from operator import sub
+#//from operator import sub
 from matplotlib import pyplot as plt
 from matplotlib.transforms import Transform, Affine2D
 from matplotlib.container import ErrorbarContainer
 from mpl_toolkits.axes_grid1 import Divider, Size
 from matplotlib.axes import Axes
-from matplotlib.figure import Figure
 from matplotlib.lines import Line2D
-from typing import Tuple, Any, Callable
+from typing import Any
 import shapely as shp
 from datatypes import (
     Labelled_Lines_Geometric_Data_Dict,
     Labels_PRcs,
     Label_Inlining_Solutions,
 )
+from processing import get_box_rot_and_trans_function
 from math import degrees
 
 
-def get_dbg_axes(ax: Axes, fig_for_debug: Figure | None) -> Tuple[Axes, Axes]:
+def get_dbg_axes(ax: Axes) -> tuple[Axes, Axes]:
     """Build a debug figure with to axes :
     - ax_data with lines build on data and inline labels
     - ax_geoms with the geometries used in label placement
@@ -25,14 +25,9 @@ def get_dbg_axes(ax: Axes, fig_for_debug: Figure | None) -> Tuple[Axes, Axes]:
     plt.close("all")
     # Determine original Axes dimensions,
     # TODO delete transformation to fig coordinates if only ax_bbox ratio is needed (see below) -> after an observation period starting with v0.1.6
-    if fig_for_debug is None:
-        ax_bbox = ax.get_window_extent().transformed(
-            ax.figure.dpi_scale_trans.inverted()  # pyright: ignore[reportOptionalMemberAccess]
-        )
-    else:
-        ax_bbox = ax.get_window_extent().transformed(
-            fig_for_debug.dpi_scale_trans.inverted()
-        )
+    ax_bbox = ax.get_window_extent().transformed(
+        ax.figure.dpi_scale_trans.inverted()  # pyright: ignore[reportOptionalMemberAccess]
+    )
 
     fig_dbg = plt.figure(
         dpi=ax.get_figure().get_dpi(),  # pyright: ignore[reportOptionalMemberAccess]
@@ -76,8 +71,8 @@ def get_dbg_axes(ax: Axes, fig_for_debug: Figure | None) -> Tuple[Axes, Axes]:
     ax_data.axis(ax.axis())
     ax_geoms.sharex(ax_data)
     # TODO Commented because leads to wrong ax_geoms aspect -> figure out why I used that initially.
-    # ax_data.set_aspect(get_axe_aspect(ax), adjustable="box")
-    # ax_geoms.set_aspect(get_axe_aspect(ax), adjustable="datalim")
+    #// ax_data.set_aspect(get_axe_aspect(ax), adjustable="box")
+    #// ax_geoms.set_aspect(get_axe_aspect(ax), adjustable="datalim")
     fig_dbg.canvas.draw()
     return ax_data, ax_geoms
 
@@ -98,21 +93,21 @@ def retrieve_lines_and_labels(ax: Axes) -> tuple[list[Line2D], list[str]]:
     return linelikeHandles, linelikeLabels
 
 
-def get_axe_aspect(ax: Axes) -> float:
-    """Computes the drawn data aspect radio of an Axe to circumvemt 'auto' value
-    returned by matplotlib.axes.Axes.get_aspect.
-    Solution found at https://stackoverflow.com/questions/41597177/get-aspect-ratio-of-axes
-    """
-    # Total figure size
-    (
-        figW,
-        figH,
-    ) = ax.get_figure().get_size_inches()  # pyright: ignore[reportOptionalMemberAccess]
-    _, _, w, h = ax.get_position().bounds  # Axis size on figure
-    disp_ratio = (figH * h) / (figW * w)  # Ratio of display units
-    # Ratio of data units. Negative over negative because of the order of subtraction
-    data_ratio = sub(*ax.get_ylim()) / sub(*ax.get_xlim())
-    return disp_ratio / data_ratio
+#//def get_axe_aspect(ax: Axes) -> float:
+#//    """Computes the drawn data aspect radio of an Axe to circumvemt 'auto' value
+#//    returned by matplotlib.axes.Axes.get_aspect.
+#//    Solution found at https://stackoverflow.com/questions/41597177/get-aspect-ratio-of-axes
+#//    """
+#//    # Total figure size
+#//    (
+#//        figW,
+#//        figH,
+#//    ) = ax.get_figure().get_size_inches()  # pyright: ignore[reportOptionalMemberAccess]
+#//    _, _, w, h = ax.get_position().bounds  # Axis size on figure
+#//    disp_ratio = (figH * h) / (figW * w)  # Ratio of display units
+#//    # Ratio of data units. Negative over negative because of the order of subtraction
+#//    data_ratio = sub(*ax.get_ylim()) / sub(*ax.get_xlim())
+#//    return disp_ratio / data_ratio
 
 
 def get_geom2disp_trans(ax: Axes) -> Transform:
@@ -162,7 +157,7 @@ def plot_labels_PRcs(
     ld: Labelled_Lines_Geometric_Data_Dict,
     gl_PRcs: Labels_PRcs,
     sep_levels: list[float],
-) -> list[Line2D]:
+):
     """Plot label Position/Rotation candidates with separation around"""
     #! Case where sep is None to be handled !!!
     bf_colors = {1.0: "tab:green", 0.5: "tab:olive", 0.0: "tab:orange", -1.0: "red"}
@@ -275,7 +270,14 @@ def plot_labels_PRcs(
         )
     )
 
-    return partial_ax_geoms_legend
+    ax_geoms.legend(  # pyright: ignore[reportPossiblyUnboundVariable]
+        handles=partial_ax_geoms_legend,  # pyright: ignore[reportPossiblyUnboundVariable]
+        bbox_to_anchor=(1.05, 1),
+        loc="upper left",
+        borderaxespad=0.0,
+        handletextpad=1,
+        # labelspacing = 0.5,
+    )
 
 
 def draw_inlined_labels(
@@ -317,7 +319,7 @@ def draw_dbg_inlined_labels(
     linelikeLabels: list[str],
     data_linelikeHandles: list[Line2D],
     data_linelikeLabels: list[str],
-    get_lbox_geom: Callable,
+    ld: Labelled_Lines_Geometric_Data_Dict,
     lis: Label_Inlining_Solutions,
 ):
     for label in list(lis):
@@ -382,6 +384,7 @@ def draw_dbg_inlined_labels(
             ),
         )
         # Get the label box in geom coordinates
+        get_lbox_geom = get_box_rot_and_trans_function(ld[label].boxd)
         rtl_box = shp.boundary(
             get_lbox_geom(  # pyright: ignore[reportPossiblyUnboundVariable]
                 "box", lis[label].cpt, lis[label].rot
@@ -412,18 +415,17 @@ def add_noninlined_labels_legend(
         **l_text_kwarg,
     )
 
+
 def add_dbg_noninlined_labels_legend(
     ax: Axes,
     debug: bool,
     l_text_kwarg: dict[str, Any],
     ax_data: Axes,
-    ax_geoms: Axes,
     linelikeHandles: list[Line2D],
     linelikeLabels: list[str],
     data_linelikeHandles: list[Line2D],
     data_linelikeLabels: list[str],
     legend_labels: list[str],
-    partial_ax_geoms_legend: list[Line2D],
 ):
     if debug:
         ax_data.legend(  # pyright: ignore[reportPossiblyUnboundVariable]
@@ -438,14 +440,7 @@ def add_dbg_noninlined_labels_legend(
             labels=legend_labels,
             **l_text_kwarg,
         )
-        ax_geoms.legend(  # pyright: ignore[reportPossiblyUnboundVariable]
-            handles=partial_ax_geoms_legend,  # pyright: ignore[reportPossiblyUnboundVariable]
-            bbox_to_anchor=(1.05, 1),
-            loc="upper left",
-            borderaxespad=0.0,
-            handletextpad=1,
-            # labelspacing = 0.5,
-        )
+
     ax.legend(
         handles=[linelikeHandles[linelikeLabels.index(label)] for label in legend_labels],
         labels=legend_labels,

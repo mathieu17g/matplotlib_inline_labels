@@ -1,5 +1,5 @@
 from functools import cache
-from typing import Tuple, Any, Callable, get_args, cast
+from typing import Any, Callable, get_args, cast, Literal
 import numpy as np
 import numpy.ma as ma
 from nptyping import NDArray, Shape, Float, Object
@@ -16,7 +16,7 @@ from datatypes import (
     Label_Rotation_Estimates_Dict,
     Rotation_Search_State,
     Label_Rs,
-    Labels_lcPRcs,
+    Labels_lcs_adjPRcs_groups,
     Labels_PRcs,
 )
 import shapely as shp
@@ -55,7 +55,7 @@ assert np.all(NOSEP_LEVEL < np.array(SEP_LEVELS))
 
 
 @cache
-def get_cos_sin(rot: float) -> Tuple[float, float]:
+def get_cos_sin(rot: float) -> tuple[float, float]:
     ct, st = np.cos(rot), np.sin(rot)
     return ct, st
 
@@ -68,6 +68,7 @@ def get_buffered_ev(w: float, h: float, buffer: float) -> NDArray[Shape["3,4"], 
     # Build the label's box vertices, extended with a one vector for translation computation
     ev = np.array(((-hw, hw, hw, -hw), (hh, hh, -hh, -hh), (1, 1, 1, 1)))
 
+    assert buffer >= 0, "`buffer` should be >= 0.0"
     if buffer == 0.0:
         return ev
     else:
@@ -76,7 +77,9 @@ def get_buffered_ev(w: float, h: float, buffer: float) -> NDArray[Shape["3,4"], 
 
 
 def get_box_rot_and_trans_function(boxd: Label_Box_Dimensions):
-    def get_lbox_geom(type: str, c: Point, rot: float, buffer: float = 0.0):
+    def get_lbox_geom(
+        type: Literal["sides", "box"], c: Point, rot: float, buffer: float = 0.0
+    ):
         """Returns label's box pygeos objects with center at point c
         and rotated by angle rot:
         - Box polygon
@@ -87,20 +90,13 @@ def get_box_rot_and_trans_function(boxd: Label_Box_Dimensions):
         ct, st = get_cos_sin(rot)
         RT = np.array(((ct, -st, c.x), (st, ct, c.y)))
 
-        if buffer >= 0.0:
-            bev = get_buffered_ev(boxd.w, boxd.h, buffer)
-        else:
-            raise Exception("`buffer` should be >= 0.0")
+        bev = get_buffered_ev(boxd.w, boxd.h, buffer)
 
         rtvt = (RT @ bev).T
         if type == "sides":
             return shp.linestrings([(rtvt[i - 1], rtvt[i]) for i in range(4)])
         elif type == "box":
             return shp.polygons(rtvt)
-        else:
-            raise ValueError(
-                "Type parameter value in cached_rotations should be in 'sides' or 'box'"
-            )
 
     return get_lbox_geom
 
@@ -124,7 +120,7 @@ def get_other_line_chunks_buffered_geom(
     return olcb_geom
 
 
-@Timer(name="l_box_rot_check", logger=None)
+@Timer(name="l_box_rot_check")
 def l_box_rot_check(
     c: Point,
     rot: float,
@@ -133,7 +129,7 @@ def l_box_rot_check(
     lc_idx: int,
     get_lbox_geom: Callable[[str, Point, float, float], Any],
     buffer: float = 0.0,
-) -> Tuple[bool, float]:
+) -> tuple[bool, float]:
     """Label's box rotation sample acceptability check and alignment error calculation
     if the line chunk as only two intersections points with the label's box small sides
     Returns :
@@ -184,45 +180,11 @@ def l_box_rot_check(
     return rot_isvalid, align_err
 
 
-# Intersection check between label's box
-# - centered at point c,
-# - rotated about point c with angle rot
-# - buffered with buffer size or list of buffer sizes
-def rtl_box_intersects_olcl(
-    c: Point,
-    rot: float,
-    ld: Labelled_Lines_Geometric_Data_Dict,
-    label: str,
-    sep_levels: list[float],
-    olcb_geom: NDArray[Any, Object],
-    get_lbox_geom: Callable,
-) -> list[bool]:
-    """Returns array of bool if the label's box:
-    - translated to current label position candidate and rotated by rot,
-    - buffered with a buffer size of buffer_size
-        intersects with at least one of all other line chunks geometries
-    """
-    # Create the current label box for x and rot
-    rtl_box = get_lbox_geom("box", c, rot)
-    lbox_h = ld[label].boxd.h
-    rtl_buffered_boxes = np.array(
-        [shp.buffer(rtl_box, bf * lbox_h) if bf != 0.0 else rtl_box for bf in sep_levels]
-    )
-    # shp.prepare(rtl_buffered_boxes) #! Boxes preparation slows down the algorithm
-    return np.any(
-        shp.intersects(
-            olcb_geom.reshape(1, len(olcb_geom)),
-            rtl_buffered_boxes.reshape(len(rtl_buffered_boxes), 1),
-        ),
-        axis=1,
-    )
-
-
 # TODO: test if it would be faster to test intersection incrementally starting with the
 # TODO: largest buffering factor
 
 
-# @Timer(name="get_sep", logger=None)
+# @Timer(name="get_sep")
 def get_sep(
     c: Point,
     rot: float,
@@ -259,8 +221,7 @@ def get_sep(
 
 
 # Theta rotation angle candidate evaluation.
-# @timer
-@Timer(name="eval_rot", logger=None)
+@Timer(name="eval_rot")
 def eval_rot(
     rot: float,
     c: Point,
@@ -274,7 +235,7 @@ def eval_rot(
     min_align_err: float,
     olcb_geom: NDArray[Any, Object],
     get_lbox_geom: Callable,
-) -> Tuple[Rotation_BiSearch_State, float]:
+) -> tuple[Rotation_BiSearch_State, float]:
     # Initialize the new rotation search state
     new_rbs = rbs
     # Initialize the new minimum alignment error
@@ -393,7 +354,7 @@ def evaluate_candidates(
     lre: Label_Rotation_Estimates_Dict,
     get_lbox_geom: Callable,
     debug: bool,
-    graph_labels_lcPRcs: Labels_lcPRcs,
+    graph_labels_lcs_adjPRcs_groups: Labels_lcs_adjPRcs_groups,
     graph_labels_PRcs: Labels_PRcs,
     overall_pbar: tqdm | None,
 ):
@@ -441,6 +402,8 @@ def evaluate_candidates(
     # Set the maximum rotation wander from pre estimated label rotation in the search for
     # the best rotation
     idx_shift_max = ceil(2 * atan(ld[label].boxd.h / ld[label].boxd.w) / IRSrad)
+
+    graph_labels_lcs_adjPRcs_groups[label] |= {lc_idx: list[Label_PRcs]([])}
 
     ##################################################
     # Evaluation of each positions on the line chunk #
@@ -518,12 +481,15 @@ def evaluate_candidates(
     # Append label's position/rotation candidates found on this line chunk to the line other
     # candidates
     # Clustered by line chunk and adjacency
-    graph_labels_lcPRcs[label] += cluster_adj_Pcs(lc_Label_PRcs, lcg.lc, lcg.slc_sds)
+    graph_labels_lcs_adjPRcs_groups[label][lc_idx] = cluster_adj_Pcs(
+        lc_Label_PRcs, lcg.lc, lcg.slc_sds
+    )
+
     # Unclustered
     graph_labels_PRcs[label] += lc_Label_PRcs
 
 
-# @Timer(name="cluster_adj_Pcs", logger=None)
+# @Timer(name="cluster_adj_Pcs")
 def cluster_adj_Pcs(
     lc_Label_PRcs: Label_PRcs,
     lc: shp.LineString | Point | None,
