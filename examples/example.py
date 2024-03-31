@@ -17,12 +17,12 @@ fig, ax = plt.subplots()
 
 for a in A:
     Y = np.sin(a * X)
-    Y[100+5*a:100+5*a*3] = np.nan
+    # Y[100+5*a:100+5*a*3] = np.nan
     ax.plot(X, Y, label=f"Line {a}")
 
 fig_debug = add_inline_labels(ax, ppf=1.5, debug=True, fontsize="small")
 
-fig_debug.savefig("example_debug.png", bbox_inches="tight") # pyright: ignore[reportOptionalMemberAccess]
+fig_debug.savefig("./example_debug.png", bbox_inches="tight") # pyright: ignore[reportOptionalMemberAccess]
 
 
 # %% Examples
@@ -31,7 +31,7 @@ axes = axes.flatten()
 
 for a in A:
     axes[0].plot(X, np.arctan(a * X), label=f"Line {a}")
-add_inline_labels(axes[0], with_overall_progress=True, fontsize="large")
+add_inline_labels(axes[0], fontsize="large")
 
 for a in A:
     axes[1].plot(X, np.sin(a * X), label=f"Line {a}")
@@ -39,13 +39,13 @@ for a in A:
     axes[3].plot(X, chi2(5).pdf(a * X), label=f"Line {a}") # pyright: ignore[reportAttributeAccessIssue]
     axes[4].semilogx(X, np.arctan(5 * a * X), label=str(a)) # pyright: ignore[reportAttributeAccessIssue]
     axes[5].semilogx(X, chi2(5).pdf(a * X), label=str(a)) # pyright: ignore[reportAttributeAccessIssue]
-add_inline_labels(axes[1], with_overall_progress=True, fontsize="small")
-add_inline_labels(axes[2], with_overall_progress=True, fontsize="x-small")
-add_inline_labels(axes[3], with_overall_progress=True, fontsize="medium")
-add_inline_labels(axes[4], with_overall_progress=True, fontsize="small")
-add_inline_labels(axes[5], with_overall_progress=True, fontsize="small")
+add_inline_labels(axes[1], fontsize="small")
+add_inline_labels(axes[2], fontsize="x-small")
+add_inline_labels(axes[3], fontsize="medium")
+add_inline_labels(axes[4], fontsize="small")
+add_inline_labels(axes[5], fontsize="small")
 
-fig.savefig("example.png")
+fig.savefig("./example.png")
 
 
 # %%

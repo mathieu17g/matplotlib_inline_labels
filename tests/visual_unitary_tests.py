@@ -40,9 +40,7 @@ for a in A:
     if a == 20:
         # Cut at 90 for testing no radius lowering option available case
         # Cut at 100 for testing radius lowering option available case
-        Y[90:-1] = (
-            np.nan
-        )  
+        Y[90:-1] = np.nan
     ax.plot(X, Y, label=f"T{a}")
 
 fig_debug = add_inline_labels(
@@ -236,7 +234,6 @@ add_inline_labels(axes[3], with_overall_progress=True, debug=True, fontsize="med
 add_inline_labels(axes[4], with_overall_progress=True, debug=True, fontsize="small")
 add_inline_labels(axes[5], with_overall_progress=True, debug=True, fontsize="small")
 
-fig
 
 # %% Profiling
 fig, ax = plt.subplots()
