@@ -2,7 +2,6 @@
 
 ## v0.2.1 Release Notes
 This realase brings:
-- Performance enhancement **To be evaluated**
 - Bug fixes
 - Test enhancements
 
