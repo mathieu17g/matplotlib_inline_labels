@@ -6,13 +6,17 @@ This realase brings:
 
 ### Algorithm
 ---
-- **Pre-processing**
-  - **TODO** Enhanced filtering on closeness of candidates to any "distant" part of the same line (folds) or to any other line of the plot. Now closeness scan through discrete SEP_LEVELS until at leat one found. Enough being 
 - **Trailing TODO**
-  - **Processing**: Optimize the function giving the label's bounding box rotated and translated geometry, and its usage 
   - **Processing and post-processing**: use of more discrete separation levels or a move to continuous separation levels
   - **Post-processing**: use multi-objective optimization based on pymoo to enhance labels' position among themselves
   - **Post-processing**: handle the case where two labels overlap because the highest separation level found, is 0 on the two corresponding lines. This will be handled after multi-objective optimization implementation
+- **Discarded avenues for improving performance**:
+  - At pre-preprocessing stage, enhance filtering on closeness of candidates to any "distant" part of the same line (folds) or to any other line of the plot by scanning through discrete SEP_LEVELS until at least one candidate is found instead of just using the smallest separation level
+  - At processing stage, optimizing the function giving the label's bounding box rotated and translated geometry, by using cached pre-rotated geometries and translating them with `shapely.affinity.translate` does not work due to the latter function low performance
+
+### Bug fixes
+---
+- <span style="color:red">**TODO**</span> Fixed github action for automatic github release creation with notes extraction from `NEWs.md`
 
 ## v0.2.1 Release Notes
 This realase brings:
