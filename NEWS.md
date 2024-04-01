@@ -1,5 +1,19 @@
 # `matplotlib_inline_labels` news
 
+## v0.2.2 Release Notes
+This realase brings:
+- ...
+
+### Algorithm
+---
+- **Pre-processing**
+  - **TODO** Enhanced filtering on closeness of candidates to any "distant" part of the same line (folds) or to any other line of the plot. Now closeness scan through discrete SEP_LEVELS until at leat one found. Enough being 
+- **Trailing TODO**
+  - **Processing**: Optimize the function giving the label's bounding box rotated and translated geometry, and its usage 
+  - **Processing and post-processing**: use of more discrete separation levels or a move to continuous separation levels
+  - **Post-processing**: use multi-objective optimization based on pymoo to enhance labels' position among themselves
+  - **Post-processing**: handle the case where two labels overlap because the highest separation level found, is 0 on the two corresponding lines. This will be handled after multi-objective optimization implementation
+
 ## v0.2.1 Release Notes
 This realase brings:
 - Bug fixes
