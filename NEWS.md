@@ -14,6 +14,10 @@ This realase brings:
   - At pre-preprocessing stage, enhance filtering on closeness of candidates to any "distant" part of the same line (folds) or to any other line of the plot by scanning through discrete SEP_LEVELS until at least one candidate is found instead of just using the smallest separation level
   - At processing stage, optimizing the function giving the label's bounding box rotated and translated geometry, by using cached pre-rotated geometries and translating them with `shapely.affinity.translate` does not work due to the latter function low performance
 
+### Misc
+---
+- <span style="color:red">**TODO**</span> Rendered inlined labels' rotation independant of axis' datalims
+
 ### Bug fixes
 ---
 - <span style="color:red">**TODO**</span> Fixed github action for automatic github release creation with notes extraction from `NEWs.md`
