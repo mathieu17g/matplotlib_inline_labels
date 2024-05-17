@@ -1,4 +1,5 @@
 # %%
+from IPython.core.getipython import get_ipython
 import numpy as np
 from matplotlib import pyplot as plt
 from scipy.stats import chi2, loglaplace
@@ -11,6 +12,21 @@ import sys
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
 from inline_labels import add_inline_labels
+from selfseparation import (
+    halflinechunk2boxsep_shapely,  # noqa: F401
+    halflinechunk2boxsep_numpy,  # noqa: F401
+    halflinechunk2boxsep_numpy_vectorized,  # noqa: F401
+)
+from processing import (
+    lbox_rot_check,  # noqa: F401
+    get_trisep,  # noqa: F401
+)
+
+IS = get_ipython()
+if IS is not None:
+    IS.run_line_magic("load_ext", "line_profiler")
+
+np.set_printoptions(precision=None, floatmode="maxprec")
 
 X = np.linspace(0, 1, 1000)
 A = [1, 2, 5, 10, 20]
@@ -21,6 +37,39 @@ funcs = [
     chi2(5).pdf,  # pyright: ignore[reportAttributeAccessIssue]
 ]
 
+# %% Continuous seperation debug 1
+fig, ax = plt.subplots()
+
+X1 = np.linspace(0, 0.75, 11)
+Y1 = 0.5 - abs(X1 - 0.5)
+X2 = np.linspace(0.75, 0.3, 11)
+Y2 = 0 * X2 + 0.25
+ax.plot(np.hstack([X1, X2]), np.hstack([Y1, Y2]), label="Accent 1")
+fig_debug = add_inline_labels(ax, po="advanced", debug=True)
+# if IS is not None:
+#     IS.run_line_magic(
+#         "lprun",
+#         '-f lbox_rot_check.__wrapped__ fig_debug = add_inline_labels(ax, po="advanced",'
+#         " debug=True)",
+#     )
+
+# %% Continuous seperation debug 1
+fig, ax = plt.subplots()
+
+X1 = np.array([0.0, 1.0])
+Y1 = np.array([0.0, 0.0])
+X2 = np.linspace(1.0, 2.0, 100)
+Y2 = np.sin((X2 - 1.0) * np.pi * 5)
+X3 = np.array([2.0, 5.0])
+Y3 = np.array([0.0, 0.0])
+X4 = np.linspace(5.0, 6.0, 100)
+Y4 = np.sin((X4 - 5.0) * np.pi * 5)
+X5 = np.array([6.0, 8.5])
+Y5 = np.array([0.0, 0.0])
+ax.plot(np.hstack([X1, X2, X3, X4, X5]), np.hstack([Y1, Y2, Y3, Y4, Y5]), label="There")
+ax.set_ylim(-10, 10)
+fig_debug = add_inline_labels(ax, ppf=1, maxpos=100, po="advanced", debug=True)
+
 # %% Visual debug simple function plotting with function equation in label
 x = np.linspace(0, 1)
 K = [1, 2, 4]
@@ -28,7 +77,13 @@ K = [1, 2, 4]
 for k in K:
     plt.plot(x, np.sin(k * x), label=rf"$f(x)=\sin({k} x)$")
 
-fig_debug = add_inline_labels(plt.gca(), ppf=0.5, debug=True)
+fig_debug = add_inline_labels(plt.gca(), ppf=0.5, po="advanced", debug=True)
+# if IS is not None:
+#     IS.run_line_magic(
+#         "lprun",
+#         "-f lbox_rot_check.__wrapped__ fig_debug = add_inline_labels(plt.gca(), ppf=0.5,"
+#         ' po="advanced", debug=True)',
+#     )
 fig_debug.get_axes()[0].set_xlabel("$x$")  # pyright: ignore[reportOptionalMemberAccess]
 fig_debug.get_axes()[0].set_ylabel("$f(x)$")  # pyright: ignore[reportOptionalMemberAccess]
 
@@ -83,7 +138,7 @@ for a in A:
         label=f"Line {a}",
     )
 
-fig_debug = add_inline_labels(ax, ppf=1, debug=True, fontsize="medium")
+fig_debug = add_inline_labels(ax, ppf=1, po="advanced", debug=True, fontsize="medium")
 
 # %% Visual debug with x as dates with nan values at line extremities
 fig, ax = plt.subplots()
@@ -184,6 +239,14 @@ ax.set_aspect("equal", adjustable="box")
 
 fig_debug = add_inline_labels(ax, ppf=1, debug=True, fontsize="small")
 
+# if IS is not None:
+#     # IS.run_line_magic("lprun", "-f halflinechunk2boxsep_numpy_vectorized.__wrapped__ fig_debug = add_inline_labels(ax, ppf=1, debug=True, fontsize=\"small\")")
+#     IS.run_line_magic(
+#         "lprun",
+#         "-f get_trisep.__wrapped__ fig_debug = add_inline_labels(ax, ppf=1, debug=True,"
+#         ' fontsize="small")',
+#     )
+
 # %% Visual debug example 5 (well separated circles)
 fig, ax = plt.subplots()
 
@@ -210,7 +273,7 @@ X = np.linspace(0, 1, 1000)
 
 for a in A:
     axes[0].plot(X, np.arctan(a * X), label=f"Line {a}")
-add_inline_labels(axes[0], with_overall_progress=True, debug=True, fontsize="large")
+add_inline_labels(axes[0], with_overall_progress=True, debug=False, fontsize="large")
 
 for a in A:
     axes[1].plot(X, np.sin(a * X), label=f"Line {a}")
@@ -228,11 +291,11 @@ for a in A:
     axes[5].semilogx(
         X, chi2(5).pdf(a * X), label=str(a)  # pyright: ignore[reportAttributeAccessIssue]
     )
-add_inline_labels(axes[1], with_overall_progress=True, debug=True, fontsize="small")
-add_inline_labels(axes[2], with_overall_progress=True, debug=True, fontsize="x-small")
-add_inline_labels(axes[3], with_overall_progress=True, debug=True, fontsize="medium")
-add_inline_labels(axes[4], with_overall_progress=True, debug=True, fontsize="small")
-add_inline_labels(axes[5], with_overall_progress=True, debug=True, fontsize="small")
+add_inline_labels(axes[1], with_overall_progress=True, debug=False, fontsize="small")
+add_inline_labels(axes[2], with_overall_progress=True, debug=False, fontsize="x-small")
+add_inline_labels(axes[3], with_overall_progress=True, debug=False, fontsize="medium")
+add_inline_labels(axes[4], with_overall_progress=True, debug=False, fontsize="small")
+add_inline_labels(axes[5], with_overall_progress=True, debug=False, fontsize="small")
 
 
 # %% Profiling

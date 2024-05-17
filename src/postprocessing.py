@@ -1,17 +1,24 @@
 from datatypes import (
+    lc_isclosed,
     Label_Inlining_Solutions,
     Labels_lcs_adjPRcs_groups,
     Labelled_Lines_Geometric_Data_Dict,
     Label_PR,
     SepLongestSubgroups,
+    Labels_PRcs,
 )
 
 from processing import SEP_LEVELS
-from math import isclose
 import shapely as shp
 from shapely import LineString
 import numpy as np
 from utils import Timer
+
+from pymcdm.methods import TOPSIS
+from pymcdm import weights as w
+# from pymcdm.helpers import rrankdata
+# from pymcdm.correlations import weighted_spearman
+# from pymcdm.helpers import correlation_matrix
 
 #! BEGIN algo1 imports
 # //from typing import NamedTuple
@@ -45,8 +52,8 @@ def solselect_monocrit(
     graph_lbls_lcs_adjPRcs_grps: Labels_lcs_adjPRcs_groups,
     ld: Labelled_Lines_Geometric_Data_Dict,
 ) -> tuple[Label_Inlining_Solutions, list[str]]:
-    """For each label, and for the highest separation label found, takes the middle of the 
-    longuest continuous label position candidate list. And in case there are several, takes 
+    """For each label, and for the highest separation label found, takes the middle of the
+    longuest continuous label position candidate list. And in case there are several, takes
     the one with the longuest linear distance on the corresponding line chunk"""
     # Initialize best (label center) position candidate, per label dictionary
     lis = Label_Inlining_Solutions({})
@@ -62,7 +69,7 @@ def solselect_monocrit(
                 lcs_sep_PRc_masks |= {
                     lc_idx: [
                         [
-                            PRc.rot is not None and PRc.sep is not None and PRc.sep == sep
+                            PRc.rot is not None and PRc.osep is not None and PRc.osep == sep
                             for PRc in PRc_adjgrp
                         ]
                         for PRc_adjgrp in PRc_adjgrps
@@ -77,8 +84,8 @@ def solselect_monocrit(
                 for lc_adjgrp_idx, sep_lcPRc_mask in enumerate(sep_lcPRc_masks)
                 if sum(sep_lcPRc_mask) > 0
             ):
-                lcg = ld[label].lcgl[lc_idx]
-                lc = ld[label].lcgl[lc_idx].lc
+                lcg = ld[label].iflcgl[lc_idx]
+                lc = ld[label].iflcgl[lc_idx].lc
                 assert isinstance(lc, LineString)
                 PRcs = graph_lbls_lcs_adjPRcs_grps[label][lc_idx][lc_adjgrp_idx]
                 # Indices of PRc candidates with a separation equal to sep level
@@ -90,16 +97,12 @@ def solselect_monocrit(
                 # if first PRc of the first group and last PRc of the last group are
                 # adjacent according to the adjusted sampling distance of the line
                 # chunk. If yes, merge last and first groups
-                if (
-                    len(grps) > 1
-                    and isclose(lc.coords[0][0], lc.coords[-1][0])
-                    and isclose(lc.coords[0][1], lc.coords[-1][1])
-                ):
+                if len(grps) > 1 and lc_isclosed(lc):
                     d1 = shp.line_locate_point(lc, PRcs[grps[0][0]].pos)
                     d2 = shp.line_locate_point(lc, PRcs[grps[-1][-1]].pos)
                     d = shp.length(lc) - max(d1, d2) + min(d1, d2)
-                    assert len(lcg.slc_sds) == 1
-                    if d < 1.1 * list(lcg.slc_sds.values())[0]:
+                    assert len(lcg.lc_sds) == 1
+                    if d < 1.1 * list(lcg.lc_sds.values())[0]:
                         grps = [grps[-1] + grps[0]] + [
                             grp for grp in grps if grp not in [grps[0], grps[-1]]
                         ]
@@ -154,6 +157,63 @@ def solselect_monocrit(
     legend_labels = []
 
     for label in list(graph_lbls_lcs_adjPRcs_grps):
+        if label not in list(lis):
+            # Add label to the list of labels with no non overlapping placement
+            # available. To be drawn in a standard legend
+            legend_labels.append(label)
+
+    return lis, legend_labels
+
+
+
+
+
+@Timer(name="solselect_multicrit")
+def solselect_multicrit(
+    linelikeLabels: list[str],
+    lPRcs: Labels_PRcs,
+    ld: Labelled_Lines_Geometric_Data_Dict,
+) -> tuple[Label_Inlining_Solutions, list[str]]:
+    # Initialize best (label center) position candidate, per label dictionary
+    lis = Label_Inlining_Solutions({})
+
+    for label in (label for label in linelikeLabels if lPRcs[label]):
+        valid_PRcs = [
+            PRc
+            for PRc in lPRcs[label]
+            if (
+                PRc.rot is not None
+                and PRc.osep is not None
+                and PRc.fsep is not None
+                and PRc.isep is not None
+                and PRc.csep is not None
+            )
+        ]
+        alts = np.array(
+            [[PRc.aerr, PRc.osep, PRc.fsep, PRc.isep, PRc.csep] for PRc in valid_PRcs]
+        )
+        print(f"{alts=}")
+        # Define weights and criteria types.
+        # weights = w.entropy_weights(alts)
+        weights = w.standard_deviation_weights(alts)
+        print(f"{weights=}")
+        types = np.array([-1, 1, 1, -1, -1])
+        topsis = TOPSIS()
+        pref = topsis(alts, weights, types)
+        print(f"{pref=}")
+        print(f"{np.argmax(pref)=}")
+        print(f"{alts[np.argmax(pref)]=}")
+        sol_idx = np.argmax(pref)
+        lis[label] = Label_PR(
+            valid_PRcs[sol_idx].pos, 
+            valid_PRcs[sol_idx].rot, # pyright: ignore[reportArgumentType]
+            )
+        print(f"{lis[label]=}")
+
+    # Initialize legend content for labels than cannot be inlined properly on their curve
+    legend_labels = []
+
+    for label in list(lPRcs):
         if label not in list(lis):
             # Add label to the list of labels with no non overlapping placement
             # available. To be drawn in a standard legend

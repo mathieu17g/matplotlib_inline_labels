@@ -6,7 +6,10 @@ This realase brings:
 
 ### Algorithm
 ---
-- **Trailing TODO**
+- **Geometries extraction**: line chunks splitting around self intersections and insterserctions with other line geometries is now to done at the geometry extraction stage to simplify following stages
+- **Processing**: added an option to use a continuous separation between line geometries and self separation for each line geometries
+- <span style="color:blue">**Trailing TODO**</span>
+  - **Processing**: Add the possibility to change the cone angle for considering that a line chunk segment is moving away from a label's bounding box, when calculating self separation
   - **Processing and post-processing**: use of more discrete separation levels or a move to continuous separation levels
   - **Post-processing**: use multi-objective optimization based on pymoo to enhance labels' position among themselves
   - **Post-processing**: handle the case where two labels overlap because the highest separation level found, is 0 on the two corresponding lines. This will be handled after multi-objective optimization implementation

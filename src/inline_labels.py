@@ -4,11 +4,12 @@ from utils import (
     Timer,
 )
 from datatypes import (
-    Line_Chunk_Geometries,
+    IFLineChunkGeoms,
     Label_Rotation_Estimates_Dict,
     Label_PRcs,
     Labels_lcs_adjPRcs_groups,
     Labels_PRcs,
+    PLACEMENT_ALGORITHM_OPTIONS,
 )
 from drawing import (
     get_dbg_axes,
@@ -35,7 +36,7 @@ from processing import (
     SEP_LEVELS,
     evaluate_candidates,
 )
-from postprocessing import solselect_monocrit
+from postprocessing import solselect_monocrit, solselect_multicrit
 from matplotlib import pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.axes import Axes
@@ -61,7 +62,7 @@ plt.close("all")
 
 
 def get_label_rotation_estimates(
-    lcg: Line_Chunk_Geometries,
+    lcg: IFLineChunkGeoms,
 ) -> list[int]:
     """Converts labels' rotation estimates from radians to index of rotation samples list"""
     # Get rotation estimations in radians
@@ -85,7 +86,7 @@ def add_inline_labels(
     ax: Axes,
     ppf: float = 1,  # Position precision factor
     maxpos: int = 100,
-    po: Literal["default"] = "default",  # Placement algorithm option
+    po: PLACEMENT_ALGORITHM_OPTIONS = "advanced",  # Placement algorithm option
     with_overall_progress: bool = False,
     overall_progress_desc: str = "Labels placement",
     with_perlabel_progress: bool = False,
@@ -153,7 +154,7 @@ def _add_inline_labels(
     ax: Axes,
     ppf: float = 1,  # Position precision factor
     maxpos: int = 100,
-    po: Literal["default"] = "default",  # Placement algorithm option
+    po: PLACEMENT_ALGORITHM_OPTIONS = "advanced",  # Placement algorithm option
     with_overall_progress: bool = False,
     overall_progress_desc: str = "Labels placement",
     with_perlabel_progress: bool = False,
@@ -216,7 +217,7 @@ def _add_inline_labels(
 
     # Build a dictionary of line's width per label
     ld_lw = get_axe_lines_widths(ax, linelikeHandles, linelikeLabels)
-    # Build a dictionary of (line chunks and bufferd line chunk) list (in Axes coordinates)
+    # Build a dictionary of (line chunks and buffered line chunk) list (in Axes coordinates)
     # for all labels
     ld = get_axe_lines_geometries(ax, linelikeHandles, linelikeLabels, ld_lw, debug)
     # Plot curves as geometric objects for DEBUG
@@ -253,7 +254,7 @@ def _add_inline_labels(
     ##############################################################
     if with_overall_progress:
         overall_candidates_number = sum(
-            [len(lcg.pcl) for label in list(ld) for lcg in ld[label].lcgl]
+            [len(lcg.pcl) for label in list(ld) for lcg in ld[label].iflcgl]
         )
         overall_progress_cm = tqdm(
             total=overall_candidates_number,
@@ -272,7 +273,7 @@ def _add_inline_labels(
 
     lre = Label_Rotation_Estimates_Dict(
         {
-            label: [get_label_rotation_estimates(lcg) for lcg in ld[label].lcgl]
+            label: [get_label_rotation_estimates(lcg) for lcg in ld[label].iflcgl]
             for label in linelikeLabels
         }
     )
@@ -306,12 +307,16 @@ def _add_inline_labels(
 
             # TODO: add an option to parallelize per line chunk computation for line chunk
             # TODO: with enough candidates
-            for lc_idx, lcg in enumerate(ld[label].lcgl):
+            print(f"Label {label} - {len(ld[label].iflcgl)} line chunks")
+            for lc_idx, lcg in enumerate(ld[label].iflcgl):
+                print(f"Label {label} - Line chunk {lc_idx}")
+                print(f"{len(lcg.pcl)} candidates")
                 if len(lcg.pcl) != 0:
                     evaluate_candidates(
                         ld,
                         label,
                         lc_idx,
+                        po,
                         with_perlabel_progress,
                         with_overall_progress,
                         lcg,
@@ -329,6 +334,7 @@ def _add_inline_labels(
             ax_geoms,  # pyright: ignore[reportPossiblyUnboundVariable]
             ld,
             graph_labels_PRcs,
+            po,
             SEP_LEVELS,
         )
 
@@ -338,10 +344,16 @@ def _add_inline_labels(
 
     #! Default label best position algorithm: center of longuest contiguous label position
     #! candidates with the highest separation level found for earch line
-    if po == "default":
+    if po == "basic":
         lis, legend_labels = solselect_monocrit(
             linelikeLabels, graph_labels_lcs_adjPRcs_groups, ld
         )
+    elif po == "advanced":
+        lis, legend_labels = solselect_multicrit(linelikeLabels, graph_labels_PRcs, ld)
+        # TODO: develop a more advanced algorithm
+        pass
+    else: # pragma: no cover
+        raise ValueError("Unknown placement algorithm option")
 
     # TODO: Add new algorithms
 
@@ -350,7 +362,9 @@ def _add_inline_labels(
     #############################
 
     if not debug:
-        draw_inlined_labels(ax, l_text_kwarg, linelikeHandles, linelikeLabels, lis)
+        draw_inlined_labels(ax, l_text_kwarg, linelikeHandles, linelikeLabels, 
+                            lis, # pyright: ignore[reportPossiblyUnboundVariable]
+                            )
     else:
         draw_dbg_inlined_labels(
             ax,
@@ -362,16 +376,16 @@ def _add_inline_labels(
             data_linelikeHandles,  # pyright: ignore[reportPossiblyUnboundVariable]
             data_linelikeLabels,  # pyright: ignore[reportPossiblyUnboundVariable]
             ld,
-            lis,
+            lis, # pyright: ignore[reportPossiblyUnboundVariable]
         )
 
     # ? Add a legend for all handles which are not line like artists according to function
     # ? retrieve_lines_and_labels
 
     # Add legend with all labels than could not be positionned properly on their curve
-    if legend_labels and debug:
+    if legend_labels and debug: # pyright: ignore[reportPossiblyUnboundVariable]
         print(f"Unplaced labels : {legend_labels}")
-    if legend_labels and (len(legend_labels) != len(linelikeLabels)):
+    if legend_labels and (len(legend_labels) != len(linelikeLabels)):# pyright: ignore[reportPossiblyUnboundVariable]
         if not debug:
             add_noninlined_labels_legend(
                 ax, l_text_kwarg, linelikeHandles, linelikeLabels, legend_labels

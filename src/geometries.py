@@ -1,18 +1,21 @@
 from datatypes import (
-    Labelled_Line_Geometric_Data,
+    CCTOL,
+    LabelledLineGeometricData,
     Labelled_Lines_Geometric_Data_Dict,
-    Line_Chunk_Geometries,
-    Label_Box_Dimensions,
+    IFLineChunkGeoms,
+    LabelBBDims,
 )
 from utils import Timer
 from matplotlib.transforms import Transform, Affine2D
 from matplotlib.axes import Axes
 from matplotlib.lines import Line2D
-#//from matplotlib.dates import date2num
+
+# //from matplotlib.dates import date2num
 from typing import cast
 from nptyping import NDArray
 import shapely as shp
 import shapely.ops as shpops
+from shapely import GeometryType as GT
 import numpy as np
 from numpy import ma
 from math import isclose
@@ -35,57 +38,51 @@ def get_axe_lines_geometries(
     ld_lw: dict[str, float],
     debug: bool = True,
 ) -> Labelled_Lines_Geometric_Data_Dict:
-    """Build a dictionary of (line chunks and bufferd line chunk) list
+    """Build a dictionary of (line chunks and buffered line chunk) list
     (in Axes coordinates) for all labels
 
+    This function takes in the Axes object, a list of Line2D handles, a list of labels,
+    a dictionary of line widths per label, and a debug flag. It returns a dictionary
+    containing the geometries for each label.
+
+    The function performs the following steps:
+    1. Get the transformation from display coordinates to Axes coordinates scaled to be 
+    cartesian on display.
+    2. Iterate over each label and retrieve the Line2D object corresponding to the label.
+    3. Get the x and y data from the Line2D object and transform them to Axes coordinates.
+    4. Create Point and LineString geometries for each continuous sequence of data points.
+    5. Correct floating point imprecision at end points for closed curves.
+    6. Create a box representing the Axes area in geometry coordinates.
+    7. Split the line geometries into line chunks and clip them by the Axes area.
+    8. Split the line chunks around self-intersections.
+    9. Compute the union of all geometries of other labels and apply a buffer to be able
+       to remerge line strings without merging at intersection points.
+    10. Split the label's geometries around intersections with other labels' geometries.
+    11. Add the resulting geometries to the dictionary for each label.
+
+    Parameters:
+    - ax (Axes): The Axes object.
+    - linelikeHandles (list[Line2D]): A list of Line2D handles.
+    - linelikeLabels (list[str]): A list of labels.
+    - ld_lw (dict[str, float]): A dictionary of line widths per label.
+    - debug (bool, optional): A flag to enable debug output. Defaults to True.
+
     Returns :
-    `Plot_Labels_Geom_Data`
+    `Labelled_Lines_Geometric_Data_Dict` containing the geometries for each label
     """
     ld = Labelled_Lines_Geometric_Data_Dict({})
     trans_data2geom = ax.transData + get_disp2geom_trans(ax)
     # For each label add the geometries to label's entry of the Plot_Labels_Geom_Data dict
-    # structure, except the intersection free
+    # structure
+    #! First stage: get geometries from Line2D objects
     for label in linelikeLabels:
         # Retrieve Line2D object corresponding to label
         h = linelikeHandles[linelikeLabels.index(label)]
 
-        # Initialize current label's line chunk dictionary
-        ld[label] = Labelled_Line_Geometric_Data()
-
         # Get the x and y data from Line2D object
         X_raw, Y_raw = cast(tuple[NDArray, NDArray], h.get_data(orig=False))
 
-        # TODO: commented in version 2.1-dev -> to delete after some observation time
-        #// # Check that x and y data are either of type float or datetime64.
-        #// # And if of type datetime64, converts it to float
-        #// print(f"{X_raw.dtype=}")
-        #// if X_raw.dtype == np.datetime64:
-        #//     # Convert x data from date_time to float
-        #//     X_raw_float = date2num(X_raw)
-        #// elif X_raw.dtype == np.dtype("float64"):
-        #//     X_raw_float = X_raw
-        #// else:
-        #//     raise ValueError(
-        #//         f"Line label: {label} has x data neither of type float or date, which is"
-        #//         " not handle for now"
-        #//     )
-        #// if Y_raw.dtype == np.datetime64:
-        #//     # Convert y data from date_time to float
-        #//     Y_raw_float = date2num(Y_raw)
-        #// elif Y_raw.dtype == np.dtype("float64"):
-        #//     Y_raw_float = Y_raw
-        #// else:
-        #//     raise ValueError(
-        #//         f"Line label: {label} has y data neither of type float or date, which is"
-        #//         " not handle for now"
-        #//     )
-#//        # Convert from Data coordinates to Axes coordinates
-        #//XY_geom = ma.masked_invalid(
-        #//    trans_data2geom.transform(np.c_[X_raw_float, Y_raw_float])
-        #//)
-        XY_geom = ma.masked_invalid(
-            trans_data2geom.transform(np.c_[X_raw, Y_raw])
-        )
+        XY_geom = ma.masked_invalid(trans_data2geom.transform(np.c_[X_raw, Y_raw]))
 
         # Correct floating point imprecision for closed curves
         unmasked_inds = np.nonzero(np.logical_not(XY_geom.mask))[0]
@@ -130,6 +127,12 @@ def get_axe_lines_geometries(
         # Split everything around self intersections
         lgeoms = shp.unary_union(lcl)
 
+        centroid = shp.centroid(lgeoms)
+
+        # Initialize current label's geometry data structure with centroid and empty line
+        # chunk geometrires lists (siflcgl and iflcgl) and unset bounding box dimensions
+        ld[label] = LabelledLineGeometricData(centroid=centroid)
+
         if not shp.is_empty(lgeoms):
             # Extract point geometries
             pt_geoms = shp.unary_union(
@@ -157,20 +160,52 @@ def get_axe_lines_geometries(
                 lsl2 = [ls for ls in shp.get_parts(shpops.linemerge(dangles))]
                 ls_geoms = shp.unary_union(lrl + lsl1 + lsl2)
 
-            for geoms in [pt_geoms, ls_geoms]:
-                # Add geometries to label's entry of the Plot_Labels_Geom_Data dict structure
-                if not shp.is_empty(geoms):
-                    if shp.get_num_geometries(geoms) > 1:
-                        for g in geoms.geoms:
-                            shp.prepare(g)
-                            gb = shp.buffer(g, ld_lw[label] / 2)
-                            shp.prepare(gb)
-                            ld[label].lcgl += [Line_Chunk_Geometries(lc=g, lcb=gb)]
+            # Save geometries by label in an intermediary data structure
+            for geom in [pt_geoms, ls_geoms]:
+                if not shp.is_empty(geom):
+                    if shp.get_num_geometries(geom) > 1:
+                        for g in geom.geoms:
+                            ld[label].siflcgl += [g]
                     else:
-                        shp.prepare(geoms)
-                        gb = shp.buffer(geoms, ld_lw[label] / 2)
+                        ld[label].siflcgl += [geom]
+
+    #! Second stage: split all line chunks intersections with other labels' geometries
+    for label in linelikeLabels:
+
+        # Compute the union of all geometries of all other labels and apply a epsilon buffer
+        # to be able to remerge line strings without merging at intersections points between
+        # label's geometries and other labels's geometries after difference
+        ols = list(ld.keys())
+        ols.remove(label)
+        if ols:
+            aolgb = shp.buffer(
+                shp.unary_union([geom for ol in ols for geom in ld[ol].siflcgl]), CCTOL / 10
+            )
+        else:
+            aolgb = shp.Polygon()
+
+        # Split label's geometries around interserctions with all other labels' geometries,
+        # add resulting geometries to label's entry of the Plot_Labels_Geom_Data dict
+        # structure
+        for (i, g) in enumerate(ld[label].siflcgl):
+            if shp.get_type_id(g) == GT.POINT or shp.get_type_id(g) == GT.LINESTRING:
+                # TODO: filter Point geometries, before linemerge
+                geoms = shp.get_parts(g.difference(aolgb))
+                pt_geoms = [g for g in geoms if shp.get_type_id(g) == GT.POINT]
+                ls_geoms = [g for g in geoms if shp.get_type_id(g) != GT.POINT]
+                sgeoms = pt_geoms + [sg for sg in shp.get_parts(shpops.linemerge(ls_geoms))]
+                for sg in sgeoms:
+                    if not shp.is_empty(sg):
+                        shp.prepare(sg)
+                        gb = shp.buffer(sg, ld_lw[label] / 2)
                         shp.prepare(gb)
-                        ld[label].lcgl += [Line_Chunk_Geometries(lc=geoms, lcb=gb)]
+                        ld[label].iflcgl += [IFLineChunkGeoms(lc=sg, lcb=gb)]
+                        ld[label].if2siflcgl_inds += [i]
+            else:  # pragma: no cover
+                raise ValueError(
+                    f"Should not have encoutered a geometry of type {shp.get_type_id(g)}."
+                    " Please report an issue on the project's github page."
+                )
 
     return ld
 
@@ -217,7 +252,7 @@ def update_ld_with_label_text_box_dimensions(
     # Calculate width and height in Axes' coordinates
     lbox_w, lbox_h = (lbox_pts[1][0] - lbox_pts[0][0]), (lbox_pts[1][1] - lbox_pts[0][1])
     # Add dictionary of label box dimensions
-    ld[label].boxd = Label_Box_Dimensions(w=lbox_w, h=lbox_h)
+    ld[label].boxd = LabelBBDims(w=lbox_w, h=lbox_h)
     # Delete the label from the plot
     l_text.remove()
     return lbox_w, lbox_h

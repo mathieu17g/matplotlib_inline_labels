@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
-from shapely import LineString, Point, Polygon
+from shapely import LineString, Point, Polygon, get_coordinates
+from math import isclose
 from typing import Literal, NewType
 
 #####################################################
@@ -13,19 +14,67 @@ from typing import Literal, NewType
 # - labels' bounding boxes                                 #
 ############################################################
 
+"""Tolerance used to identify curve closure"""
+CCTOL = 1e-9
+
+
+# TODO: create and use a lcisclosed function and/or attribute using CCTOL
+def lc_isclosed(lc: LineString) -> bool:
+    """Check if a line chunk is closed
+
+    Args:
+    - lc: LineString to be checked
+
+    Returns:
+    - True if the line chunk is closed
+    - False otherwise
+    """
+    if lc.is_closed:
+        return True
+    else:
+        coords = get_coordinates(lc)
+        return isclose(
+            coords[0][0], coords[-1][0], rel_tol=CCTOL, abs_tol=CCTOL
+        ) and isclose(coords[0][1], coords[-1][1], rel_tol=CCTOL, abs_tol=CCTOL)
+
+
+@dataclass
+class SIFLineChunkGeom:
+    """Self-intersection free line chunk defined by
+    - line continuous data subsets (NaN values create gaps in the line chunk)
+    - clipping by plot area
+    - splitting around self-intersections
+    - splitting into individual points and linestrings geometries
+
+    Attributes:
+    - `lc` (LineString | Point): Line chunk geometry"""
+
+    lc: LineString | Point
+    """Line chunk geometry"""
+
+
+SIFLineChunkGeomsList = NewType("SIFLineChunkGeomsList", list[LineString | Point])
+"""List of geometries associated with one labelled line
+- continuous data line chunks (NaN values create gaps in the line chunk)
+- clipping by plot area
+- splitting around self-intersections
+- splitting into individual points and linestrings geometries
+
+Type: `list[LineString | Point]`"""
+
 
 # TODO2 Once a densier separation value will be calculated for each PRc, enabling to get rid
 # TODO2 of the PRc adjacency considerations when choosing the final PRc, DELETE the sd:
 # TODO2 sampling distance parameter
 @dataclass
-class Line_Chunk_Geometries:
+class IFLineChunkGeoms:
     """Line chunk associated geometries in cartesian Axe coordinates
 
     Attributes:
     - `lc`: Line chunk geometry
     - `lcb`: Line chunk buffered with Line2D width
     - `pcl`: Label box center candidate list
-    - `slc_sds`: Line chunk adjusted sampling distance per corresponding candidates indices
+    - `lc_sds`: Line chunk adjusted sampling distance per corresponding candidates indices
     range in the label's box's center candidates list
     - `re`: Rotation estimates for each candidates in radians
     """
@@ -36,15 +85,21 @@ class Line_Chunk_Geometries:
     """Line chunk buffered with Line2D width"""
     pcl: list[Point] = field(default_factory=list)
     """Label box center candidate list"""
-    slc_sds: dict[slice, float] = field(default_factory=dict)
+    lc_sds: dict[slice, float] = field(default_factory=dict)
     """Line chunk adjusted sampling distance per corresponding candidates indices range in 
     the label's box's center candidates list"""
     re: list[float] = field(default_factory=list)
     """Rotation estimate for each candidates in radians"""
 
 
+IFLineChunkGeomsList = NewType("IFLineChunkGeomsList", list[IFLineChunkGeoms])
+"""List of geometries associated with one labelled line intersection free line chunks
+
+Type: `list[IFLineChunkGeoms]`"""
+
+
 @dataclass
-class Label_Box_Dimensions:
+class LabelBBDims:
     """Label's bounding box dimensions
 
     Attributes:
@@ -58,33 +113,41 @@ class Label_Box_Dimensions:
     """Label's bounding box height"""
 
 
-Line_Chunk_Geometries_List = NewType(
-    "Line_Chunk_Geometries_List", list[Line_Chunk_Geometries]
-)
-"""List of geometries associated with one labelled line intersection free line chunks
-
-Type: `list[Line_Chunk_Geometries]`"""
-
-
 @dataclass
-class Labelled_Line_Geometric_Data:
-    """Labelled line geometric data composed of line chunks' geometries label bounding box dimensions
+class LabelledLineGeometricData:
+    """Labelled line geometric data composed of line chunks' geometries and label bounding box dimensions
 
     Attributes:
-    - `lcgl`: Label's line chunks' associated geometries list
-    - `boxd`: Label's bounding box dimensions
+    - `centroid`: Label's line chunks' centroid
+    - `siflcgl`: Self-Intersection Free Line Chunks' associated Geometries List
+    - `iflcgl`: Intersection Free Line Chunks' associated Geometries List
+    - `if2siflcgl_inds`: Indices of the intersection free line chunks in the self-intersection free line chunks list
+    - `boxd`: Label's Bounding Box dimensions
+
+    Args:
+    - `centroid`: Label's line chunks' centroid
+    - `siflcgl`: Self-Intersection Free Line Chunks' associated Geometries List
+    - `iflcgl`: Intersection Free Line Chunks' associated Geometries List
+    - `if2siflcgl_inds`: Indices of the intersection free line chunks in the self-intersection free line chunks list
+    - `boxd`: Label's Bounding Box dimensions
     """
 
-    lcgl: Line_Chunk_Geometries_List = field(
-        default_factory=lambda: Line_Chunk_Geometries_List([])
+    centroid: Point
+    """Label's line chunks' centroid"""
+    siflcgl: SIFLineChunkGeomsList = field(
+        default_factory=lambda: SIFLineChunkGeomsList([])
     )
-    """Intersection free line chunks' associated geometries list"""
-    boxd: Label_Box_Dimensions = field(default_factory=Label_Box_Dimensions)
-    """Label's bounding box dimensions"""
+    """Self-Intersection Free Line Chunks' associated Geometries List"""
+    iflcgl: IFLineChunkGeomsList = field(default_factory=lambda: IFLineChunkGeomsList([]))
+    """Intersection Free Line Chunks' associated Geometries List"""
+    if2siflcgl_inds: list[int] = field(default_factory=list)
+    """Indices of the intersection free line chunks in the self-intersection free line chunks list"""
+    boxd: LabelBBDims = field(default_factory=LabelBBDims)
+    """Label's Bounding Box dimensions"""
 
 
 Labelled_Lines_Geometric_Data_Dict = NewType(
-    "Labelled_Lines_Geometric_Data_Dict", dict[str, Labelled_Line_Geometric_Data]
+    "Labelled_Lines_Geometric_Data_Dict", dict[str, LabelledLineGeometricData]
 )
 """Dictionary of labelled lines' geometric data indexed by labels' text
 
@@ -150,9 +213,9 @@ class Label_R:
 
     rot: float
     """Label rotation angle in radians"""
-    err: float
+    aerr: float
     """Label alignment error on its curve"""
-    sep: float | None
+    osep: float | None
     """Label separation distance from other graphic geometries"""
 
 
@@ -182,24 +245,27 @@ class Label_PRc:
     Attributes:
     - `pos`: label center position in 2D coordinates
     - `rot`: label rotation for the center position with minimal alignment error
-    - `align_err`: label alignment error
-    - `sep`: label's separation from other graphical objects
-    - `c_dte`: linear distance from center to the edges of its adjacency subset for the highest
-      separation buffer with candidates
+    - `aerr`: label alignment error
+    - `osep`: label's separation from graphical objects other than its line chunk
+    - `fsep`: label's separation from its line chunk folds
+    - `isep`: label's separation from its line chunk curvature variations (information)
+    - `csep`: label's separation from the line chunks' centroid
     """
 
     pos: Point
     """Label center position in 2D coordinates"""
     rot: float | None
     """Label rotation angle value in radians"""
-    align_err: float | None
+    aerr: float | None
     """Label alignment error with its curve"""
-    sep: float | None = None
-    """Label's separation from other graphical objects"""
-    # TODO: reconsider the utility of distance below
-    c_dte: float | None = None
-    """Linear distance of center to the edges of its adjacency subset for the highest 
-    separation buffer with candidates"""
+    osep: float | None = None
+    """Label's separation from graphical objects other than its line chunk"""
+    fsep: float | None = None
+    """Label's separation from its line chunk folds"""
+    isep: float | None = None
+    """Label's separation from its line chunk curvature variations (information)"""
+    csep: float | None = None
+    """Label's separation from the line chunks' centroid"""
 
 
 Label_PRcs = NewType("Label_PRcs", list[Label_PRc])
@@ -235,6 +301,8 @@ Labels_PRcs = NewType("Labels_PRcs", dict[str, Label_PRcs])
 ########################################################################
 # Datastructures for labels' position and rotation candidate selection #
 ########################################################################
+
+PLACEMENT_ALGORITHM_OPTIONS = Literal["basic", "advanced"]
 
 Label_Inlining_Solutions = NewType("Label_Inlining_Solutions", dict[str, Label_PR])
 """Solutions to the label inlining problem. 

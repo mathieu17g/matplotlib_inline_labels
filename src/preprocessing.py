@@ -2,6 +2,7 @@ import numpy as np
 import shapely as shp
 from utils import Timer
 from datatypes import (
+    lc_isclosed,
     Labelled_Lines_Geometric_Data_Dict,
 )
 from typing import Literal
@@ -80,11 +81,11 @@ def update_ld_with_label_position_candidates(
     ols = list(ld.keys())
     ols.remove(label)
     if ols:
-        aolg = shp.unary_union([lcg.lc for ol in ols for lcg in ld[ol].lcgl])
+        aolg = shp.unary_union([lcg.lcb for ol in ols for lcg in ld[ol].iflcgl])
     else:
-        aolg = shp.LineString()
+        aolg = shp.Polygon()
 
-    for lc_idx, lcg in enumerate(ld[label].lcgl):
+    for lc_idx, lcg in enumerate(ld[label].iflcgl):
         lc = lcg.lc
         #! Filter line chunks too short to accomodate a proper label placement
         if shp.get_type_id(lc) == GT.POINT:
@@ -100,7 +101,7 @@ def update_ld_with_label_position_candidates(
         # Compute the union of all geometries of all other labels + all other line
         # chunks of the label associated with the line chunk (lc_idx)
         olc_geoms = [
-            lcg.lcb for olc_idx, lcg in enumerate(ld[label].lcgl) if olc_idx != lc_idx
+            lcg.lcb for olc_idx, lcg in enumerate(ld[label].iflcgl) if olc_idx != lc_idx
         ]
         if olc_geoms:
             aog = shp.unary_union([aolg, *olc_geoms])
@@ -108,213 +109,185 @@ def update_ld_with_label_position_candidates(
             aog = aolg  # ? Should we make a copy here?
         shp.prepare(aog)
 
-        #! Split the line chunk around its intersections with all other line chunks
-        #! of the current labels and of other labels, by substracting the line chunk
-        #! with the other geometries
-        slcl = list(shp.get_parts(lc.difference(aog)))
-        # Check that all resulting line chunk geometries are unique within the list
-        assert len(slcl) == len(set(slcl))
-        # Remove Point geometries and assert that all remaining geometries are
-        # LineString
-        slcl = [geom for geom in slcl if shp.get_type_id(geom) != GT.POINT]
-        assert all([shp.get_type_id(geom) == GT.LINESTRING for geom in slcl])
-        # Remove sub line chunks that are to short for the label to fit on it, i.e of
-        # length less than label's box width + height
-        slcl = [geom for geom in slcl if shp.length(geom) >= lbox_hp]
-
         #! Define a sampling distance for the label's box center position candidates on the
         #! ligne chunk, equal to a fraction of of the current label's box height. The
         #! fraction being the position precision factor (ppf) adjusted by the maximum number
         #! of candidates
-        total_useful_length = sum(
-            [
-                (
-                    shp.length(slc)
-                    if isclose(slc.coords[0][0], slc.coords[-1][0])
-                    and isclose(slc.coords[0][1], slc.coords[-1][1])
-                    else shp.length(slc) - lbox_hp
-                )
-                for slc in slcl
-            ]
+        total_useful_length = (
+            shp.length(lc) if lc_isclosed(lc) else shp.length(lc) - lbox_hp
         )
         minppf = total_useful_length / maxpos / ld[label].boxd.h
         appf = max(ppf, minppf)
         lbox_sd = ld[label].boxd.h * appf
 
-        for slc in slcl:
-            #! Sample each sub line chunk with a distance of the label's bounding box's
-            #! heigh multiplied by the position precision factor: ppf
-            assert shp.get_type_id(slc) == GT.LINESTRING
+        #! Sample each sub line chunk with a distance of the label's bounding box's
+        #! heigh multiplied by the position precision factor: ppf
+        assert shp.get_type_id(lc) == GT.LINESTRING
 
-            # Create a set of points along the sub line chunk separated by the previously
-            # defined center distance unit for the current label's box geometry
-            if isclose(slc.coords[0][0], slc.coords[-1][0]) and isclose(
-                slc.coords[0][1], slc.coords[-1][1]
-            ):
-                # Closed line chunk case : adjust sampling distance to be an integer
-                # fraction of the sub line chunk's length
-                n = int(shp.length(slc) / lbox_sd)
-                fit_sd = shp.length(slc) / n
-                # Distance samples along sub line chunk list
-                d_smpls = [i * fit_sd for i in range(n)]
-            else:
-                # ? ensure that the number of distance samples is odd
-                # Adjust sampling distance to be an integer fraction of the sub line chunk's
-                # length - minus label's box's half perimeter
-                n = max(int((shp.length(slc) - lbox_hp) / lbox_sd), 2)
-                fit_sd = (shp.length(slc) - lbox_hp) / n
-                # Distance samples along sub line chunk list
-                d_smpls = [i * fit_sd + lbox_hp / 2 for i in range(n + 1)]
-            slc_Pcl = shp.line_interpolate_point(slc, d_smpls)
+        # Create a set of points along the sub line chunk separated by the previously
+        # defined center distance unit for the current label's box geometry
+        if lc_isclosed(lc):
+            # Closed line chunk case : adjust sampling distance to be an integer
+            # fraction of the sub line chunk's length
+            n = int(shp.length(lc) / lbox_sd)
+            fit_sd = shp.length(lc) / n
+            # Distance samples along sub line chunk list
+            d_smpls = [i * fit_sd for i in range(n)]
+        else:
+            # ? ensure that the number of distance samples is odd
+            # Adjust sampling distance to be an integer fraction of the sub line chunk's
+            # length - minus label's box's half perimeter
+            n = max(int((shp.length(lc) - lbox_hp) / lbox_sd), 2)
+            fit_sd = (shp.length(lc) - lbox_hp) / n
+            # Distance samples along sub line chunk list
+            d_smpls = [i * fit_sd + lbox_hp / 2 for i in range(n + 1)]
+        lc_Pcl = shp.line_interpolate_point(lc, d_smpls)
 
-            # Remove the last element if it coincides with the right boundary point,
-            if slc_Pcl.size:
-                assert shp.length(slc) % lbox_sd != 0.0
-                # //warn("Last element of the candidates list deleted")
-                # //del slc_Pcl[-1]
+        # Remove the last element if it coincides with the right boundary point,
+        if lc_Pcl.size:
+            assert shp.length(lc) % lbox_sd != 0.0
+            # //warn("Last element of the candidates list deleted")
+            # //del lc_Pcl[-1]
 
-            # Make some verifications on the two end candidates
-            if slc_Pcl.size:
-                # Check that two end points of the list are on the line chunk
-                assert shp.intersects(pt_approx_buffer(slc_Pcl[0]), slc)
-                assert shp.intersects(pt_approx_buffer(slc_Pcl[-1]), slc)
+        # Make some verifications on the two end candidates
+        if lc_Pcl.size:
+            # Check that two end points of the list are on the line chunk
+            assert shp.intersects(pt_approx_buffer(lc_Pcl[0]), lc)
+            assert shp.intersects(pt_approx_buffer(lc_Pcl[-1]), lc)
 
-                # Check that two end points of the list are at half of box width + height
-                # distance, from their corresponding current label line chunk extremities
-                if not (
-                    isclose(slc.coords[0][0], slc.coords[-1][0])
-                    and isclose(slc.coords[0][1], slc.coords[-1][1])
-                ):
-                    assert shp.intersects(
-                        pt_approx_buffer(slc_Pcl[0]),
-                        pt_approx_buffer(shp.line_interpolate_point(slc, lbox_hp / 2)),
-                    )
-                    assert shp.intersects(
-                        pt_approx_buffer(slc_Pcl[-1]),
-                        pt_approx_buffer(
-                            shp.line_interpolate_point(slc, shp.length(slc) - lbox_hp / 2)
-                        ),
-                    )
-                else:
-                    # Check that two end points are separated by a linear distance equal to
-                    # the sampling distance
-                    assert isclose(
-                        (
-                            shp.length(slc)
-                            - shp.line_locate_point(slc, slc_Pcl[-1])
-                            + shp.line_locate_point(slc, slc_Pcl[0])
-                        ),
-                        fit_sd,
-                        rel_tol=1e-2,
-                    )
-
-            if slc_Pcl.size:
-                #! Filter points for which the circle, of radius half box height,
-                #! intersects the line chunk in more than two points
-                # TODO: use dilatation and curve topology to further enhance this filter
-                bl_slc_Pcl = shp.boundary(shp.buffer(slc_Pcl, ld[label].boxd.h / 2))
-                mask = np.equal(
-                    np.vectorize(shp.get_num_geometries)(shp.intersection(bl_slc_Pcl, lc)),
-                    2,
+            # Check that two end points of the list are at half of box width + height
+            # distance, from their corresponding current label line chunk extremities
+            if not lc_isclosed(lc):
+                assert shp.intersects(
+                    pt_approx_buffer(lc_Pcl[0]),
+                    pt_approx_buffer(shp.line_interpolate_point(lc, lbox_hp / 2)),
                 )
-                slc_Pcl = slc_Pcl[mask]
-
-            if slc_Pcl.size:
-                #! Filter points which are closer to aog than label's box half height
-                bl_slc_Pcl = shp.buffer(slc_Pcl, ld[label].boxd.h / 2)
-                mask = np.logical_not(shp.intersects(bl_slc_Pcl, aog))
-                slc_Pcl = slc_Pcl[mask]
-
-            if slc_Pcl.size:
-                #! Filter points for which the circle of radius equal to the label's box
-                #! half diagonal, intersects the current line chunk in two points which are
-                #! closer that the label's box width.
-                if curv_filter_mode == "fast":
-                    ipts_diag = circles_on_line_closest_biintersections(
-                        lbox_hd,
-                        slc,
-                        slc_Pcl,
-                        lbox_hw,
-                        mode=curv_filter_mode,
-                    )
-                    assert np.size(ipts_diag) != 0
-                    ipts_width = circles_on_line_closest_biintersections(
-                        lbox_hw, slc, slc_Pcl, mode=curv_filter_mode
-                    )
-                    assert np.size(ipts_width) != 0 and (
-                        np.size(ipts_width) == np.size(ipts_diag)
-                    )
-                    # Drop points with less than 2 "half diag circle" non empty
-                    # intersections unless they have at least 2 "half width circle" non
-                    # empty intersections
-                    mask = np.logical_or(
-                        np.vectorize(lambda ipt: not np.any(shp.is_empty(ipt)))(ipts_diag),
-                        np.vectorize(lambda ipt: not np.any(shp.is_empty(ipt)))(ipts_width),
-                    )
-                    slc_Pcl = slc_Pcl[mask]
-                    ipts_diag = ipts_diag[mask]
-                    ipts_width = ipts_width[mask]
-
-                    # For each couple of intersection points check that the distance between
-                    # the two points is greater than the label's box width, replacing the
-                    # possible "half diag circle" empty side intersection with the
-                    # corresponding non empty one from the "half width circle" intersections
-                    # * Uses the fact that with shapely a distance between a Point and an
-                    # * empty Point is np.nan and that `np.nan >= var:float` is always false
-                    assert not (shp.distance(shp.Point(0, 0), shp.Point()) > 1)
-                    mask = [
-                        (
-                            np.all(np.logical_not(shp.is_empty(ipt_d)))
-                            and shp.distance(*ipt_d) >= lbox_w
-                        )
-                        or (
-                            np.any(shp.is_empty(ipt_d))
-                            and shp.distance(
-                                nonempty_ipt(ipt_d),
-                                ipt_w[np.argmax(shp.distance(nonempty_ipt(ipt_d), ipt_w))],
-                            )
-                            >= lbox_w
-                        )
-                        for ipt_d, ipt_w in zip(ipts_diag, ipts_width)
-                    ]
-                    slc_Pcl = slc_Pcl[mask]
-
-                    # Compute an estimation of the label's box rotation based on the angle
-                    # of the segment joining the two "half width circle" intersections used
-                    # to filter on an estimated curvature
-                    if slc_Pcl.size:
-                        rot_estimates = segments_angles(list(ipts_width[mask]))
-
-                elif curv_filter_mode == "precise":
-                    ipts_diag = circles_on_line_closest_biintersections(
-                        lbox_hd,
-                        slc,
-                        slc_Pcl,
-                        lbox_hw,
-                        mode=curv_filter_mode,
-                    )
-                    assert np.size(ipts_diag) != 0
-                    mask = [shp.distance(*ipt) >= lbox_w for ipt in ipts_diag]
-                    slc_Pcl = slc_Pcl[mask]
-                    # Compute an estimation of the label's box rotation based on the angle
-                    # of the segment joining the two "half width circle" intersections used
-                    # to filter on an estimated curvature
-                    if slc_Pcl.size:
-                        rot_estimates = segments_angles(list(ipts_diag[mask]))
-
+                assert shp.intersects(
+                    pt_approx_buffer(lc_Pcl[-1]),
+                    pt_approx_buffer(
+                        shp.line_interpolate_point(lc, shp.length(lc) - lbox_hp / 2)
+                    ),
+                )
             else:
-                continue
+                # Check that two end points are separated by a linear distance equal to
+                # the sampling distance
+                assert isclose(
+                    (
+                        shp.length(lc)
+                        - shp.line_locate_point(lc, lc_Pcl[-1])
+                        + shp.line_locate_point(lc, lc_Pcl[0])
+                    ),
+                    fit_sd,
+                    rel_tol=1e-2,
+                )
 
-            if slc_Pcl.size:
-                prev_pcl_len = len(ld[label].lcgl[lc_idx].pcl)
-                ld[label].lcgl[lc_idx].slc_sds |= {
-                    slice(prev_pcl_len, prev_pcl_len + len(slc_Pcl)): fit_sd  # type: ignore
-                }
-                ld[label].lcgl[lc_idx].re += rot_estimates  # pyright: ignore
-                ld[label].lcgl[lc_idx].pcl.extend(slc_Pcl)
+        if lc_Pcl.size:
+            #! Filter points for which the circle, of radius half box height,
+            #! intersects the line chunk in more than two points
+            # TODO: use dilatation and curve topology to further enhance this filter
+            bl_lc_Pcl = shp.boundary(shp.buffer(lc_Pcl, ld[label].boxd.h / 2))
+            mask = np.equal(
+                np.vectorize(shp.get_num_geometries)(shp.intersection(bl_lc_Pcl, lc)),
+                2,
+            )
+            lc_Pcl = lc_Pcl[mask]
 
-            else:
-                continue
+        if lc_Pcl.size:
+            #! Filter points which are closer to aog than label's box half height
+            bl_lc_Pcl = shp.buffer(lc_Pcl, ld[label].boxd.h / 2)
+            mask = np.logical_not(shp.intersects(bl_lc_Pcl, aog))
+            lc_Pcl = lc_Pcl[mask]
+
+        if lc_Pcl.size:
+            #! Filter points for which the circle of radius equal to the label's box
+            #! half diagonal, intersects the current line chunk in two points which are
+            #! closer that the label's box width.
+            if curv_filter_mode == "fast":
+                ipts_diag = circles_on_line_closest_biintersections(
+                    lbox_hd,
+                    lc,
+                    lc_Pcl,
+                    lbox_hw,
+                    mode=curv_filter_mode,
+                )
+                assert np.size(ipts_diag) != 0
+                ipts_width = circles_on_line_closest_biintersections(
+                    lbox_hw, lc, lc_Pcl, mode=curv_filter_mode
+                )
+                assert np.size(ipts_width) != 0 and (
+                    np.size(ipts_width) == np.size(ipts_diag)
+                )
+                # Drop points with less than 2 "half diag circle" non empty
+                # intersections unless they have at least 2 "half width circle" non
+                # empty intersections
+                mask = np.logical_or(
+                    np.vectorize(lambda ipt: not np.any(shp.is_empty(ipt)))(ipts_diag),
+                    np.vectorize(lambda ipt: not np.any(shp.is_empty(ipt)))(ipts_width),
+                )
+                lc_Pcl = lc_Pcl[mask]
+                ipts_diag = ipts_diag[mask]
+                ipts_width = ipts_width[mask]
+
+                # For each couple of intersection points check that the distance between
+                # the two points is greater than the label's box width, replacing the
+                # possible "half diag circle" empty side intersection with the
+                # corresponding non empty one from the "half width circle" intersections
+                # * Uses the fact that with shapely a distance between a Point and an
+                # * empty Point is np.nan and that `np.nan >= var:float` is always false
+                assert not (shp.distance(shp.Point(0, 0), shp.Point()) > 1)
+                mask = [
+                    (
+                        np.all(np.logical_not(shp.is_empty(ipt_d)))
+                        and shp.distance(*ipt_d) >= lbox_w
+                    )
+                    or (
+                        np.any(shp.is_empty(ipt_d))
+                        and shp.distance(
+                            nonempty_ipt(ipt_d),
+                            ipt_w[np.argmax(shp.distance(nonempty_ipt(ipt_d), ipt_w))],
+                        )
+                        >= lbox_w
+                    )
+                    for ipt_d, ipt_w in zip(ipts_diag, ipts_width)
+                ]
+                lc_Pcl = lc_Pcl[mask]
+
+                # Compute an estimation of the label's box rotation based on the angle
+                # of the segment joining the two "half width circle" intersections used
+                # to filter on an estimated curvature
+                if lc_Pcl.size:
+                    rot_estimates = segments_angles(list(ipts_width[mask]))
+
+            elif curv_filter_mode == "precise":
+                ipts_diag = circles_on_line_closest_biintersections(
+                    lbox_hd,
+                    lc,
+                    lc_Pcl,
+                    lbox_hw,
+                    mode=curv_filter_mode,
+                )
+                assert np.size(ipts_diag) != 0
+                mask = [shp.distance(*ipt) >= lbox_w for ipt in ipts_diag]
+                lc_Pcl = lc_Pcl[mask]
+                # Compute an estimation of the label's box rotation based on the angle
+                # of the segment joining the two "half width circle" intersections used
+                # to filter on an estimated curvature
+                if lc_Pcl.size:
+                    rot_estimates = segments_angles(list(ipts_diag[mask]))
+
+        else:
+            continue
+
+        if lc_Pcl.size:
+            prev_pcl_len = len(ld[label].iflcgl[lc_idx].pcl)
+            ld[label].iflcgl[lc_idx].lc_sds |= {
+                slice(prev_pcl_len, prev_pcl_len + len(lc_Pcl)): fit_sd  # type: ignore
+            }
+            ld[label].iflcgl[lc_idx].re += rot_estimates  # pyright: ignore
+            ld[label].iflcgl[lc_idx].pcl.extend(lc_Pcl)
+
+        else:
+            continue
 
 
 def segments_angles(pts: list[npt.NDArray[shp.Point]]) -> list[float]:
@@ -349,7 +322,7 @@ def circles_on_line_closest_biintersections(
     mode: Literal["fast", "precise"] = "fast",
 ) -> NDArray[Shape["*"], Object]:  # noqa: F722
     """Given a linestring LS and an array of points P on this line, returns an array of, for
-    each point P, an array of the closest intersection points on either sides of point P, 
+    each point P, an array of the closest intersection points on either sides of point P,
     between the linestring and the circle of radius R centered on point P.
 
     If for a point P, the circle of radius R does not intersect the linestring on one side
@@ -515,9 +488,7 @@ def try_a_lower_radius(
 ) -> npt.NDArray[shp.Geometry]:
     sideIs_emptyinds = np.nonzero(shp.is_empty(sideIs))[0]
     for i in sideIs_emptyinds:
-        vertices = shp.points(
-            sideLSs[i].coords  # pyright:ignore[reportAttributeAccessIssue]
-        )
+        vertices = shp.points(shp.get_coordinates(sideLSs[i]))
         segments = (
             np.array([shp.LineString(vertices)])
             if np.size(vertices) < 2

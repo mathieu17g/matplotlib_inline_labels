@@ -1,4 +1,4 @@
-#//from operator import sub
+# //from operator import sub
 from matplotlib import pyplot as plt
 from matplotlib.transforms import Transform, Affine2D
 from matplotlib.container import ErrorbarContainer
@@ -11,6 +11,7 @@ from datatypes import (
     Labelled_Lines_Geometric_Data_Dict,
     Labels_PRcs,
     Label_Inlining_Solutions,
+    PLACEMENT_ALGORITHM_OPTIONS,
 )
 from processing import get_box_rot_and_trans_function
 from math import degrees
@@ -71,8 +72,8 @@ def get_dbg_axes(ax: Axes) -> tuple[Axes, Axes]:
     ax_data.axis(ax.axis())
     ax_geoms.sharex(ax_data)
     # TODO Commented because leads to wrong ax_geoms aspect -> figure out why I used that initially.
-    #// ax_data.set_aspect(get_axe_aspect(ax), adjustable="box")
-    #// ax_geoms.set_aspect(get_axe_aspect(ax), adjustable="datalim")
+    # // ax_data.set_aspect(get_axe_aspect(ax), adjustable="box")
+    # // ax_geoms.set_aspect(get_axe_aspect(ax), adjustable="datalim")
     fig_dbg.canvas.draw()
     return ax_data, ax_geoms
 
@@ -93,21 +94,21 @@ def retrieve_lines_and_labels(ax: Axes) -> tuple[list[Line2D], list[str]]:
     return linelikeHandles, linelikeLabels
 
 
-#//def get_axe_aspect(ax: Axes) -> float:
-#//    """Computes the drawn data aspect radio of an Axe to circumvemt 'auto' value
-#//    returned by matplotlib.axes.Axes.get_aspect.
-#//    Solution found at https://stackoverflow.com/questions/41597177/get-aspect-ratio-of-axes
-#//    """
-#//    # Total figure size
-#//    (
-#//        figW,
-#//        figH,
-#//    ) = ax.get_figure().get_size_inches()  # pyright: ignore[reportOptionalMemberAccess]
-#//    _, _, w, h = ax.get_position().bounds  # Axis size on figure
-#//    disp_ratio = (figH * h) / (figW * w)  # Ratio of display units
-#//    # Ratio of data units. Negative over negative because of the order of subtraction
-#//    data_ratio = sub(*ax.get_ylim()) / sub(*ax.get_xlim())
-#//    return disp_ratio / data_ratio
+# //def get_axe_aspect(ax: Axes) -> float:
+# //    """Computes the drawn data aspect radio of an Axe to circumvemt 'auto' value
+# //    returned by matplotlib.axes.Axes.get_aspect.
+# //    Solution found at https://stackoverflow.com/questions/41597177/get-aspect-ratio-of-axes
+# //    """
+# //    # Total figure size
+# //    (
+# //        figW,
+# //        figH,
+# //    ) = ax.get_figure().get_size_inches()  # pyright: ignore[reportOptionalMemberAccess]
+# //    _, _, w, h = ax.get_position().bounds  # Axis size on figure
+# //    disp_ratio = (figH * h) / (figW * w)  # Ratio of display units
+# //    # Ratio of data units. Negative over negative because of the order of subtraction
+# //    data_ratio = sub(*ax.get_ylim()) / sub(*ax.get_xlim())
+# //    return disp_ratio / data_ratio
 
 
 def get_geom2disp_trans(ax: Axes) -> Transform:
@@ -124,15 +125,13 @@ def plot_geometric_line_chunks(ax_geoms: Axes, ld: Labelled_Lines_Geometric_Data
         line.remove()
     # Plot all the line chunks for all labels
     for label in list(ld):
-        for lc_idx, lcg in enumerate(ld[label].lcgl):
+        for lc_idx, lcg in enumerate(ld[label].iflcgl):
+            # fmt: off
             dbg_line_color = ax_geoms.plot(
                 *(shp.get_coordinates(lcg.lc).T),
                 # label=(label + f" - chunk #{lc_idx}"),
                 transform=get_geom2disp_trans(ax_geoms),
-                clip_on=False,
-                linewidth=0.5,
-                linestyle="dashed",
-                zorder=5,
+                clip_on=False, linewidth=0.5, linestyle="dashed", zorder=5,
             )
             # Add the outline of the original line using the buffered version of the line
             # chunk
@@ -141,12 +140,10 @@ def plot_geometric_line_chunks(ax_geoms: Axes, ld: Labelled_Lines_Geometric_Data
                 # Adding a leading underscore prevent the artist to be included in
                 # automatic legend
                 label=("_" + label + f" - buffered chunk #{lc_idx}"),
-                color=dbg_line_color[0].get_color(),
-                transform=get_geom2disp_trans(ax_geoms),
-                clip_on=False,
-                linewidth=0.5,
-                zorder=5,
+                color=dbg_line_color[0].get_color(), transform=get_geom2disp_trans(ax_geoms),
+                clip_on=False, linewidth=0.5, zorder=5,
             )
+            # fmt: on
 
     if (fig := ax_geoms.get_figure()) is not None:
         fig.canvas.draw()
@@ -156,119 +153,197 @@ def plot_labels_PRcs(
     ax_geoms: Axes,
     ld: Labelled_Lines_Geometric_Data_Dict,
     gl_PRcs: Labels_PRcs,
+    po: PLACEMENT_ALGORITHM_OPTIONS,
     sep_levels: list[float],
 ):
     """Plot label Position/Rotation candidates with separation around"""
-    #! Case where sep is None to be handled !!!
-    bf_colors = {1.0: "tab:green", 0.5: "tab:olive", 0.0: "tab:orange", -1.0: "red"}
-    assert set(sep_levels + [-1.0]) == set(list(bf_colors))
-    bf_markersize = {1.0: 30, 0.5: 20, 0: 10, -1: 5}
-    bf_zorder = {1.0: 0.2, 0.5: 0.3, 0: 0.4, -1: 0.1}
-    bf_labels = {
-        1.0: "Good separation",
-        0.5: "Medium separation",
-        0.0: "Tight separation",
-        -1.0: "No separation",
-    }
+    if po == "basic":
+        #! Case where sep is None to be handled !!!
+        bf_colors = {1.0: "tab:green", 0.5: "tab:olive", 0.0: "tab:orange", -1.0: "red"}
+        assert set(sep_levels + [-1.0]) == set(list(bf_colors))
+        bf_markersize = {1.0: 30, 0.5: 20, 0: 10, -1: 5}
+        bf_zorder = {1.0: 0.2, 0.5: 0.3, 0: 0.4, -1: 0.1}
+        bf_labels = {
+            1.0: "Good separation",
+            0.5: "Medium separation",
+            0.0: "Tight separation",
+            -1.0: "No separation",
+        }
 
-    for label in list(ld):
-        # Plot label's position candidates with different label colors
+        for label in list(ld):
+            # Plot label's position candidates with different label colors
+            for bf in sep_levels + [-1]:
+                if [
+                    prc
+                    for prc in gl_PRcs[label]
+                    if prc.rot is not None and prc.osep is not None and prc.osep == bf
+                ]:
+                    X, Y, R = zip(
+                        *(
+                            (prc.pos.x, prc.pos.y, prc.rot)
+                            for prc in gl_PRcs[label]
+                            if prc.rot is not None
+                            and prc.osep is not None
+                            and prc.osep == bf
+                        ),
+                        strict=True,
+                    )
+                    # fmt: off
+                    ax_geoms.plot(X, Y, marker="o", color=bf_colors[bf], markeredgewidth=0.0,
+                        alpha=0.6, markersize=bf_markersize[bf], ls="",
+                        transform=get_geom2disp_trans(ax_geoms), zorder=bf_zorder[bf],
+                        label=bf_labels[bf],
+                    )
+                    # Add small ticks on outer marker to hint the exact position of candidates
+                    # if bf == list(bf_colors)[0]:
+                    for x, y, r in zip(X, Y, R):
+                        ax_geoms.plot(x, y, marker=(2, 0, degrees(r)), color="k",
+                            markersize=bf_markersize[0], markeredgewidth=0.5, ls="",
+                            transform=get_geom2disp_trans(ax_geoms), zorder=bf_zorder[bf],
+                        )
+                    # fmt: on
+
+            # Plot all initial candidates as a backdrop
+            lpc_list = [
+                lpc
+                for partial_lpc_list in [lcg.pcl for lcg in ld[label].iflcgl]
+                for lpc in partial_lpc_list
+            ]
+            X = [lpc.x for lpc in lpc_list]
+            Y = [lpc.y for lpc in lpc_list]
+            # fmt: off
+            ax_geoms.plot(X, Y, linewidth=0, marker="o", markerfacecolor="none",
+                markeredgecolor="tab:pink", markersize=bf_markersize[0], ls="",
+                transform=get_geom2disp_trans(ax_geoms), zorder=bf_zorder[-1] / 2,
+                label="Candidates from preprocessing",
+            )
+            # fmt: on
+
+        # Build partial custom legend for ax_geoms
+        # fmt: off
+        partial_ax_geoms_legend = []
         for bf in sep_levels + [-1]:
+            partial_ax_geoms_legend.append(
+                Line2D([0], [0], marker="o", color=bf_colors[bf], markeredgewidth=0.0,
+                    alpha=0.6, markersize=bf_markersize[bf], ls="",
+                    transform=get_geom2disp_trans(ax_geoms), zorder=bf_zorder[bf],
+                    label=bf_labels[bf],
+                )
+            )
+        partial_ax_geoms_legend.append(
+            Line2D([0], [0], marker="o", markerfacecolor="none", markeredgecolor="tab:pink",
+                markersize=bf_markersize[0], ls="", transform=get_geom2disp_trans(ax_geoms),
+                zorder=bf_zorder[-1] / 2, label="Candidates from preprocessing",
+            )
+        )
+        # fmt: on
+        legend_title = ""
+    elif po == "advanced":
+        sep_markersize = {round(0.1 * i, 1): 10 + 2 * i for i in range(0, 11)}  # | {-1: 5}
+        sep_zorder = {round(0.1 * i, 1): round(0.4 - 0.02 * (i), 2) for i in range(0, 11)}
+        # sep_labels = {
+        #     1.0: "Good separation",
+        #     0.5: "Medium separation",
+        #     0.0: "Tight separation",
+        #     -1.0: "No separation",
+        # }
+        sepattr = "isep"
+        legend_title = sepattr
+        for label in list(ld):
             if [
                 prc
                 for prc in gl_PRcs[label]
-                if prc.rot is not None and prc.sep is not None and prc.sep == bf
+                if prc.rot is not None and getattr(prc, sepattr) is not None
             ]:
-                X, Y, R = zip(
-                    *(
+                # Plot label's position candidates with different label colors
+                seps = [
+                    getattr(prc, sepattr)
+                    for prc in gl_PRcs[label]
+                    if prc.rot is not None and getattr(prc, sepattr) is not None
+                ]
+                assert all([sep >= 0 for sep in seps])
+                min_seps, max_seps = min(seps), max(seps)
+                print(f"{label}: {min_seps=}, {max_seps=}")
+                range_seps = max_seps - min_seps if max_seps != min_seps else max_seps
+                assert min_seps >= 0.0
+                # norm_seps = [(sep - min_seps) / (max_seps - min_seps) for sep in seps]
+                # norm_sep_keys = [
+                #     -1 if norm_sep < 0 else sep_markersize[round(norm_sep, 1)]
+                #     for norm_sep in norm_seps
+                # ]
+                for sep_lvl in sep_markersize:
+                    if [
                         (prc.pos.x, prc.pos.y, prc.rot)
                         for prc in gl_PRcs[label]
-                        if prc.rot is not None and prc.sep is not None and prc.sep == bf
-                    ),
-                    strict=True,
-                )
-                ax_geoms.plot(
-                    X,
-                    Y,
-                    marker="o",
-                    color=bf_colors[bf],
-                    markeredgewidth=0.0,
-                    alpha=0.6,
-                    markersize=bf_markersize[bf],
-                    ls="",
-                    transform=get_geom2disp_trans(ax_geoms),
-                    zorder=bf_zorder[bf],
-                    label=bf_labels[bf],
-                )
-                # Add small ticks on outer marker to hint the exact position of candidates
-                # if bf == list(bf_colors)[0]:
-                for x, y, r in zip(X, Y, R):
-                    ax_geoms.plot(
-                        x,
-                        y,
-                        marker=(2, 0, degrees(r)),
-                        color="k",
-                        markersize=bf_markersize[0],
-                        markeredgewidth=0.5,
-                        ls="",
-                        transform=get_geom2disp_trans(ax_geoms),
-                        zorder=bf_zorder[bf],
-                    )
+                        if prc.rot is not None
+                        and getattr(prc, sepattr) is not None
+                        and round((getattr(prc, sepattr) - min_seps) / range_seps, 1)
+                        == sep_lvl
+                    ]:
+                        X, Y, R = zip(
+                            *(
+                                (prc.pos.x, prc.pos.y, prc.rot)
+                                for prc in gl_PRcs[label]
+                                if prc.rot is not None
+                                and getattr(prc, sepattr) is not None
+                                and round(
+                                    (getattr(prc, sepattr) - min_seps) / range_seps, 1
+                                )
+                                == sep_lvl
+                            ),
+                            strict=True,
+                        )
+                        # fmt: off
+                        ax_geoms.plot(X, Y, marker="o", color="b", markeredgewidth=0.0,
+                            alpha=0.6, markersize=sep_markersize[sep_lvl], ls="",
+                            transform=get_geom2disp_trans(ax_geoms), zorder=sep_zorder[sep_lvl],
+                            label=sep_lvl,
+                        )
+                        # Add small ticks on outer marker to hint the exact position of candidates
+                        # if bf == list(bf_colors)[0]:
+                        for x, y, r in zip(X, Y, R):
+                            ax_geoms.plot(x, y, marker=(2, 0, degrees(r)), color="k",
+                                markersize=sep_markersize[0.0], markeredgewidth=0.5, ls="",
+                                transform=get_geom2disp_trans(ax_geoms), zorder=sep_zorder[sep_lvl],
+                            )
+                        # fmt: on
 
-        # Plot all initial candidates as a backdrop
-        lpc_list = [
-            lpc
-            for partial_lpc_list in [lcg.pcl for lcg in ld[label].lcgl]
-            for lpc in partial_lpc_list
-        ]
-        X = [lpc.x for lpc in lpc_list]
-        Y = [lpc.y for lpc in lpc_list]
-        ax_geoms.plot(
-            X,
-            Y,
-            linewidth=0,
-            marker="o",
-            markerfacecolor="none",
-            markeredgecolor="tab:pink",
-            markersize=bf_markersize[0],
-            ls="",
-            transform=get_geom2disp_trans(ax_geoms),
-            zorder=bf_zorder[-1] / 2,
-            label="Candidates from preprocessing",
-        )
+            # Plot all initial candidates as a backdrop
+            lpc_list = [
+                lpc
+                for partial_lpc_list in [lcg.pcl for lcg in ld[label].iflcgl]
+                for lpc in partial_lpc_list
+            ]
+            X = [lpc.x for lpc in lpc_list]
+            Y = [lpc.y for lpc in lpc_list]
+            # fmt: off
+            ax_geoms.plot(X, Y, linewidth=0, marker="o", markerfacecolor="none",
+                markeredgecolor="tab:pink", markersize=sep_markersize[0.0], ls="",
+                transform=get_geom2disp_trans(ax_geoms), zorder=0.05,
+                label="Candidates from preprocessing",
+            )
+            # fmt: on
 
-    # Build partial custom legend for ax_geoms
-    partial_ax_geoms_legend = []
-    for bf in sep_levels + [-1]:
+        # Build partial custom legend for ax_geoms
+        # fmt: off
+        partial_ax_geoms_legend = []
+        for sep_lvl in sep_markersize:
+            partial_ax_geoms_legend.append(
+                Line2D([0], [0], marker="o", color="b", markeredgewidth=0.0,
+                    alpha=0.6, markersize=sep_markersize[sep_lvl], ls="",
+                    transform=get_geom2disp_trans(ax_geoms), zorder=sep_zorder[sep_lvl],
+                    label=sep_lvl,
+                )
+            )
         partial_ax_geoms_legend.append(
-            Line2D(
-                [0],
-                [0],
-                marker="o",
-                color=bf_colors[bf],
-                markeredgewidth=0.0,
-                alpha=0.6,
-                markersize=bf_markersize[bf],
-                ls="",
-                transform=get_geom2disp_trans(ax_geoms),
-                zorder=bf_zorder[bf],
-                label=bf_labels[bf],
+            Line2D([0], [0], marker="o", markerfacecolor="none", markeredgecolor="tab:pink",
+                markersize=sep_markersize[0.0], ls="", transform=get_geom2disp_trans(ax_geoms),
+                zorder=0.05, label="Candidates from preprocessing",
             )
         )
-    partial_ax_geoms_legend.append(
-        Line2D(
-            [0],
-            [0],
-            marker="o",
-            markerfacecolor="none",
-            markeredgecolor="tab:pink",
-            markersize=bf_markersize[0],
-            ls="",
-            transform=get_geom2disp_trans(ax_geoms),
-            zorder=bf_zorder[-1] / 2,
-            label="Candidates from preprocessing",
-        )
-    )
+        # fmt: on
+    else:
+        raise ValueError("Unknown placement algorithm option")
 
     ax_geoms.legend(  # pyright: ignore[reportPossiblyUnboundVariable]
         handles=partial_ax_geoms_legend,  # pyright: ignore[reportPossiblyUnboundVariable]
@@ -277,6 +352,7 @@ def plot_labels_PRcs(
         borderaxespad=0.0,
         handletextpad=1,
         # labelspacing = 0.5,
+        title=legend_title,
     )
 
 

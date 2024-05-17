@@ -4,7 +4,8 @@ import numpy as np
 import numpy.ma as ma
 from nptyping import NDArray, Shape, Float, Object
 from datatypes import (
-    Label_Box_Dimensions,
+    lc_isclosed,
+    LabelBBDims,
     Labelled_Lines_Geometric_Data_Dict,
     Sign,
     Rotation_BiSearch_State,
@@ -12,20 +13,29 @@ from datatypes import (
     Label_R,
     Label_PRcs,
     Label_PRc,
-    Line_Chunk_Geometries,
+    IFLineChunkGeoms,
     Label_Rotation_Estimates_Dict,
     Rotation_Search_State,
     Label_Rs,
     Labels_lcs_adjPRcs_groups,
     Labels_PRcs,
+    PLACEMENT_ALGORITHM_OPTIONS,
 )
 import shapely as shp
-from shapely import Point
+from shapely import Point, LineString
 from utils import Timer
 from shapely import GeometryType as GT
 from tqdm import tqdm
 from contextlib import nullcontext
-from math import isclose, inf, atan, degrees, ceil
+from math import inf, atan, degrees, ceil, tan
+from selfseparation import (
+    halflinechunk_pareto_weighted_total_curvature,
+    # halflinechunk2boxsep_numpy,
+    halflinechunk2boxsep_numpy_vectorized,
+    # halflinechunk2boxsep_shapely,
+    distpt2seg,
+    lc_furthest_point_split,
+)
 
 
 # Define number of samples between -(π/2 - ε) to (π/2 - ε), 0 included,
@@ -76,11 +86,11 @@ def get_buffered_ev(w: float, h: float, buffer: float) -> NDArray[Shape["3,4"], 
         return np.array(((np.sign(ev[0]) * b) + ev[0], (np.sign(ev[1]) * b) + ev[1], ev[2]))
 
 
-def get_box_rot_and_trans_function(boxd: Label_Box_Dimensions):
+def get_box_rot_and_trans_function(boxd: LabelBBDims):
     def get_lbox_geom(
-        type: Literal["sides", "box"], c: Point, rot: float, buffer: float = 0.0
+        type: Literal["sides", "box", "vertices"], c: Point, rot: float, buffer: float = 0.0
     ):
-        """Returns label's box pygeos objects with center at point c
+        """Returns label's box characteristics with center at point c
         and rotated by angle rot:
         - Box polygon
         - Box short sides
@@ -97,6 +107,10 @@ def get_box_rot_and_trans_function(boxd: Label_Box_Dimensions):
             return shp.linestrings([(rtvt[i - 1], rtvt[i]) for i in range(4)])
         elif type == "box":
             return shp.polygons(rtvt)
+        elif type == "vertices":
+            # Returns center and two consecutive vertices in coundterclockwise order,
+            # starting with the lower right vertex
+            return shp.get_coordinates(c)[0], rtvt[2], rtvt[1]
 
     return get_lbox_geom
 
@@ -111,7 +125,7 @@ def get_other_line_chunks_buffered_geom(
         [
             ol_lcg.lcb
             for other_label in list(ld)
-            for ol_lc_idx, ol_lcg in enumerate(ld[other_label].lcgl)
+            for ol_lc_idx, ol_lcg in enumerate(ld[other_label].iflcgl)
             if (ol_lc_idx != lc_idx) or (other_label != label)
         ]
     )
@@ -120,8 +134,19 @@ def get_other_line_chunks_buffered_geom(
     return olcb_geom
 
 
-@Timer(name="l_box_rot_check")
-def l_box_rot_check(
+@Timer(name="adjust_aerr")
+def adjust_aerr(aerr: float, min_side_aerr: float, boxhalfwidth: float) -> float:
+    if aerr <= min_side_aerr:
+        return 0.0
+    else:
+        ang = atan(aerr / boxhalfwidth)
+        adjusted_ang = (((ang - (IRSrad / 2)) // IRSrad) + 1) * IRSrad
+        assert abs(ang - adjusted_ang) <= IRSrad, f"{ang=}, {adjusted_ang=}, {IRSrad=}"
+        return boxhalfwidth * tan(adjusted_ang)
+
+
+@Timer(name="lbox_rot_check")
+def lbox_rot_check(
     c: Point,
     rot: float,
     ld: Labelled_Lines_Geometric_Data_Dict,
@@ -136,9 +161,11 @@ def l_box_rot_check(
     - rot_isvalid (bool): boolean indicating if rot is valid
     - align_err (float): measure of the alignment error between label's box and line chunk
     """
-    l_lc = ld[label].lcgl[lc_idx].lc
-    l_lcb = ld[label].lcgl[lc_idx].lcb
+    l_lc = ld[label].iflcgl[lc_idx].lc
+    l_lcb = ld[label].iflcgl[lc_idx].lcb
     lbox_h = ld[label].boxd.h
+    lbox_w = ld[label].boxd.w
+    min_side_aerr = ld[label].boxd.w * tan(IRSrad / 2)
 
     # Rotate label's box sides and center them on current label position candidate
     rtlbs = get_lbox_geom("sides", c, rot, buffer)
@@ -158,7 +185,11 @@ def l_box_rot_check(
                 (
                     np.sum(
                         [
-                            shp.distance(shp.centroid(rtlbs[2 * i]), ssis[i])
+                            adjust_aerr(
+                                shp.distance(shp.centroid(rtlbs[2 * i]), ssis[i]),
+                                min_side_aerr,
+                                lbox_w,
+                            )
                             for i in range(2)
                         ]
                     )
@@ -211,13 +242,134 @@ def get_sep(
             rtl_buffered_box = shp.buffer(rtl_box, bf * lbox_h)
             if (
                 np.any(shp.intersects(olcb_geom, rtl_buffered_box))
-                or not l_box_rot_check(c, rot, ld, label, lc_idx, get_lbox_geom, bf)[0]
+                or not lbox_rot_check(c, rot, ld, label, lc_idx, get_lbox_geom, bf)[0]
             ):
                 continue
             else:
                 sep = bf
                 break
     return sep
+
+
+@Timer(name="get_trisep")
+def get_trisep(
+    c: Point,
+    rot: float,
+    get_lbox_geom: Callable,
+    olcb_geom: NDArray[Any, Object],
+    ld: Labelled_Lines_Geometric_Data_Dict,
+    label: str,
+    lc_idx: int,
+) -> tuple[float, float, float, float]:
+    """
+    Computes the two following separation indicators as distance between the label's
+    bounding box and:
+    - the geometries other than the label's current line chunk
+    - the line chunk's folds, folds being defined by the half line chunks oriented
+      segments that are approaching the box.
+    - the line chunk's curvature variations
+
+    Parameters:
+    - c (Point): The current label position candidate.
+    - rot (float): The rotation angle of the label's bounding box.
+    - get_lbox_geom (Callable): A function that returns the geometry of the label's
+      bounding box.
+    - olcb_geom (NDArray[Any, Object]): The geometry of the other line chunks.
+    - ld (Labelled_Lines_Geometric_Data_Dict): The dictionary containing geometric data
+      for all labels.
+    - label (str): The label being processed.
+    - lc_idx (int): The index of the line chunk being processed.
+
+    Returns:
+    - tuple[float, float, float]: The separation distances between the label's bounding box and:
+        - the geometries other than the label's current line chunk
+        - the line chunk's folds
+        - the line chunk's curvature variations
+    """
+
+    #! Distance to other geometries
+    rtl_box = get_lbox_geom("box", c, rot)
+    if all(shp.is_empty(olcb_geom)) or all([shp.is_empty(geom) for geom in olcb_geom]):
+        osep = 1.0  # TODO: verify that 1.0 vs inf is a good value for a unique geometry
+    else:
+        assert all(shp.is_prepared(olcb_geom))
+        osep: float = min(shp.distance(rtl_box, olcb_geom))
+
+    #! Separation to label's line chunk oriented segments that are approaching the box
+    # Get the line chunk's center and two vertices in counterclockwise order
+    C, V0, V1 = get_lbox_geom("vertices", c, rot)
+    segs = ((V0, V1), (C + C - V0, C + C - V1))
+
+    # Get the line chunk minus the label's box. Merge the two resulting half line chunk if
+    # the original line chunk is closed
+    hlc_pair = shp.get_parts(
+        shp.line_merge(shp.difference(ld[label].iflcgl[lc_idx].lc, rtl_box))
+    )
+
+    # If the line chunk is closed, split at its furthest point from C
+    if hlc_pair.size == 1:
+        hlc_pair = lc_furthest_point_split(hlc_pair[0], C)
+        lc_is_closed = True
+    else:
+        lc_is_closed = False
+
+    assert hlc_pair.size == 2 and all(
+        [isinstance(hlc, LineString) for hlc in hlc_pair]
+    ), f"{hlc_pair=}"
+
+    fsep = 1.0  # TODO: verify that 1.0 vs inf is a good value for a unique geometry
+    for i, hlc in enumerate(hlc_pair):
+        # Orient the half line chunk's segments starting from the box
+        bounds = shp.get_coordinates(hlc.boundary)
+        dists = np.array([[distpt2seg(pt, seg) for pt in bounds] for seg in segs])
+        min_flat_idx = np.argmin(dists)
+        hlc_pair[i] = hlc if min_flat_idx % 2 == 0 else hlc.reverse()
+
+    for hlc in hlc_pair:
+        # Compute the separation between the label's bounding box and the half line chunk's
+        fsepnew = halflinechunk2boxsep_numpy_vectorized(hlc, rtl_box)
+        # TODO: following commented code to be used in a test to compare with the numpy and
+        # TODO: shapely versions. Use the also the "Continuous seperation debug" visual test
+        # fsepnew_refshapely = halflinechunk2boxsep_shapely(hlc, rtl_box)
+        # fsepnew_refnumpy = halflinechunk2boxsep_numpy(hlc, rtl_box)
+        # assert len(fsepnew_refnumpy) == len(fsepnew)
+        # for i in range(len(fsepnew_refnumpy)):
+        #     if not isclose(fsepnew_refnumpy[i], fsepnew[i], abs_tol=1e-9):
+        #         print(f"Difference for {i=}, {fsepnew_refnumpy[i]=}, {fsepnew[i]=}")
+        #         print(f"{len(shp.get_coordinates(hlc))=}")
+        #         assert False
+        fsep = min(fsep, fsepnew)
+        # If line chunk is openned, calculate the distance to the line chunk's extremities
+        # if not lc_is_closed:
+        #     fsep = min(fsep, rtl_box.distance(shp.Point(shp.get_coordinates(hlc)[-1])))
+
+    #! Separation from line chunk's curvature variations
+    isep = sum(
+        [
+            halflinechunk_pareto_weighted_total_curvature(hlc, ld[label].boxd.h)
+            for hlc in hlc_pair
+        ]
+    )
+    iflc = ld[label].iflcgl[lc_idx].lc
+    siflc = ld[label].siflcgl[ld[label].if2siflcgl_inds[lc_idx]]
+    if isinstance(siflc, LineString):
+        if siflc.is_closed:
+            ilc = siflc
+        else:
+            ilc = shp.LineString([*(siflc.coords)] + [siflc.coords[0]])
+    else:
+        raise ValueError(
+            "Unexpected geometry type for the intersection-free line chunk's geometry at"
+            " this stage, Please report an issue."
+        )
+    ic = ilc.project(c)
+    
+    print(f"\n{isep=:.3e}\n")
+
+    #! Separation from the line chunks' centroid
+    csep = c.distance(ld[label].centroid)
+
+    return osep, fsep, isep, csep
 
 
 # Theta rotation angle candidate evaluation.
@@ -241,7 +393,7 @@ def eval_rot(
     # Initialize the new minimum alignment error
     new_min_align_err = min_align_err
     # Check if label rotation is acceptable (no overlap with other geometries)
-    lbox_aligns_well, align_err = l_box_rot_check(c, rot, ld, label, lc_idx, get_lbox_geom)
+    lbox_aligns_well, align_err = lbox_rot_check(c, rot, ld, label, lc_idx, get_lbox_geom)
     # If rotated label aligns "well" with the current line chunk,
     if lbox_aligns_well:
         # Check if the label's bounding box does not does not intersect with other geometries
@@ -274,6 +426,7 @@ def eval_rot(
 
     return new_rbs, new_min_align_err
 
+
 @Timer(name="filter_best_rotations")
 def filter_best_rotations(
     lc_LPmRc: list[Label_PmR],
@@ -282,75 +435,102 @@ def filter_best_rotations(
     lc_idx: int,
     olcb_geom: NDArray,
     get_lbox_geom: Callable,
+    po: PLACEMENT_ALGORITHM_OPTIONS,
 ) -> Label_PRcs:
     """For each label position candidate of a line chunk, keep only the best rotation
-    candidate
+    candidate.
 
-    It is assumed that for each rotation candidate of a position candidate, that its sep
+    It is assumed that for each rotation candidate of a position candidate, its sep
     value is either `NOSEP_LEVEL` or `None`:
-    - `NOSEP_LEVEL` corresponds to a rotated label which aligns well with the line chunk but overlap
-    another line chunk or another line
+    - `NOSEP_LEVEL` corresponds to a rotated label which aligns well with the line chunk but overlaps
+    another line chunk or another line.
     - `None` corresponds to a rotated label which aligns well with the line chunk and does not
-    overlap any other line chunk or other line
+    overlap any other line chunk or other line.
 
     Args:
-    - lc_LPmRc: label center candidates, with multi rotation candidates for each
-    - ld: dictionary of labelled lines' geometric data indexed by labels' text
-    - label: label's text
-    - lc_idx: line chunk index in line chunk geometries list of the current labelled line
-    geometric data
-    - olcb_geom: other line chunks buffered geometries
-    - get_lbox_geom: label's bounding box rotation and transmission function
-
+    - lc_LPmRc: List of label center candidates, with multiple rotation candidates for each.
+    - ld: Dictionary of labelled lines' geometric data indexed by labels' text.
+    - label: Label's text.
+    - lc_idx: Line chunk index in line chunk geometries list of the current labelled line
+    geometric data.
+    - olcb_geom: Other line chunks buffered geometries.
+    - get_lbox_geom: Label's bounding box rotation and transmission function.
+    - po: Placement algorithm options.
 
     Returns:
-    - a list of label center position candidates and best rotation candidate for each one
+    - A list of label center position candidates and the best rotation candidate for each one.
     """
+    # TODO: add a align error normalization stage to the algorithm
+
     lc_Label_PRcs = Label_PRcs([])
     for PmR in lc_LPmRc:
         # Check if any valid rotation candidate has been found
         if PmR.rot_cands:
-            seps = [rc.sep for rc in PmR.rot_cands]
+            seps = [rc.osep for rc in PmR.rot_cands]
             mask = [sep is None for sep in seps]
             if any(mask):
-                errs = ma.array([rc.err for rc in PmR.rot_cands], mask=np.logical_not(mask))
-                best_Rc = PmR.rot_cands[ma.argmin(errs)]
-                # Get separation for best candidate
-                best_Rc.sep = get_sep(
-                    c=PmR.pos,
-                    rot=best_Rc.rot,
-                    ld=ld,
-                    label=label,
-                    lc_idx=lc_idx,
-                    olcb_geom=olcb_geom,
-                    get_lbox_geom=get_lbox_geom,
-                    min_sep=0.0,
+                errs = ma.array(
+                    [rc.aerr for rc in PmR.rot_cands], mask=np.logical_not(mask)
                 )
-                assert best_Rc.sep >= 0
-                # Create the Label center position and single rotation candidate
-                lc_Label_PRcs += [Label_PRc(PmR.pos, best_Rc.rot, best_Rc.err, best_Rc.sep)]
+                best_Rc: Label_R = PmR.rot_cands[ma.argmin(errs)]
+                # Get separation for the best candidate
+                if po == "basic":
+                    best_Rc.osep = get_sep(
+                        c=PmR.pos,
+                        rot=best_Rc.rot,
+                        ld=ld,
+                        label=label,
+                        lc_idx=lc_idx,
+                        olcb_geom=olcb_geom,
+                        get_lbox_geom=get_lbox_geom,
+                        min_sep=0.0,
+                    )
+                    assert best_Rc.osep >= 0
+                    # Create the Label center position and single rotation candidate
+                    lc_Label_PRcs += [
+                        Label_PRc(PmR.pos, best_Rc.rot, best_Rc.aerr, best_Rc.osep)
+                    ]
+                elif po == "advanced":
+                    seps = get_trisep(
+                        c=PmR.pos,
+                        rot=best_Rc.rot,
+                        get_lbox_geom=get_lbox_geom,
+                        olcb_geom=olcb_geom,
+                        ld=ld,
+                        label=label,
+                        lc_idx=lc_idx,
+                    )
+                    # print(f"{seps[0]=:.3f}, {seps[1]=:.3f}, {seps[2]=:.3f}")
+                    # Create the Label center position and single rotation candidate
+                    lc_Label_PRcs += [Label_PRc(PmR.pos, best_Rc.rot, best_Rc.aerr, *seps)]
+                else:  # pragma: no cover
+                    raise ValueError("Unknown placement algorithm option")
             else:
                 assert np.all(
                     np.equal(  # pyright: ignore[reportCallIssue]
                         seps, NOSEP_LEVEL  # pyright: ignore[reportArgumentType]
                     )
                 )
-                errs = [rc.err for rc in PmR.rot_cands]
+                errs = [rc.aerr for rc in PmR.rot_cands]
                 best_Rc = PmR.rot_cands[np.argmin(errs)]
-                lc_Label_PRcs += [Label_PRc(PmR.pos, best_Rc.rot, best_Rc.err, NOSEP_LEVEL)]
+                lc_Label_PRcs += [
+                    Label_PRc(PmR.pos, best_Rc.rot, best_Rc.aerr, NOSEP_LEVEL)
+                ]
         else:
             lc_Label_PRcs += [Label_PRc(PmR.pos, None, None)]
 
     return lc_Label_PRcs
+
 
 @Timer(name="evaluate_candidates")
 def evaluate_candidates(
     ld: Labelled_Lines_Geometric_Data_Dict,
     label: str,
     lc_idx: int,
+    po: PLACEMENT_ALGORITHM_OPTIONS,
     with_perlabel_progress: bool,
     with_overall_progress: bool,
-    lcg: Line_Chunk_Geometries,
+    lcg: IFLineChunkGeoms,
     lre: Label_Rotation_Estimates_Dict,
     get_lbox_geom: Callable,
     debug: bool,
@@ -475,14 +655,14 @@ def evaluate_candidates(
     # For each label position candidates dictionary separation level keep only the best
     # rotation candidates
     lc_Label_PRcs = filter_best_rotations(
-        lc_LmPmR, ld, label, lc_idx, olcb_geom, get_lbox_geom
+        lc_LmPmR, ld, label, lc_idx, olcb_geom, get_lbox_geom, po
     )
 
     # Append label's position/rotation candidates found on this line chunk to the line other
     # candidates
     # Clustered by line chunk and adjacency
     graph_labels_lcs_adjPRcs_groups[label][lc_idx] = cluster_adj_Pcs(
-        lc_Label_PRcs, lcg.lc, lcg.slc_sds
+        lc_Label_PRcs, lcg.lc, lcg.lc_sds
     )
 
     # Unclustered
@@ -492,20 +672,20 @@ def evaluate_candidates(
 # @Timer(name="cluster_adj_Pcs")
 def cluster_adj_Pcs(
     lc_Label_PRcs: Label_PRcs,
-    lc: shp.LineString | Point | None,
-    slc_sds: dict[slice, float],
+    lc: LineString | Point | None,
+    lc_sds: dict[slice, float],
 ) -> list[Label_PRcs]:
     """Knowing that the label's box's center candidates are chosen with a unique sampling
     distance per line chunk, cluster the candidates by adjacency"""
     # Check that the line chunk is not None or reduced to a point
-    assert isinstance(lc, shp.LineString)
+    assert isinstance(lc, LineString)
 
     # Project the candidates points on the line chunk to make the clusterization based on
     # the projected distance to origin
     pts = [PRc.pos for PRc in lc_Label_PRcs if PRc is not None]
 
     PRc_clusters = list[Label_PRcs]([])
-    for sl, sd in slc_sds.items():
+    for sl, sd in lc_sds.items():
         sl_pts = pts[sl]
         if len(sl_pts) <= 1:
             PRc_clusters += [lc_Label_PRcs[sl]]
@@ -518,16 +698,12 @@ def cluster_adj_Pcs(
                 for i, j in zip([0] + split_inds, split_inds + [None])
             ]
     # Handle the closed line chunk case
-    if (
-        len(PRc_clusters) > 1
-        and isclose(lc.coords[0][0], lc.coords[-1][0])
-        and isclose(lc.coords[0][1], lc.coords[-1][1])
-    ):
+    if len(PRc_clusters) > 1 and lc_isclosed(lc):
         if (
             shp.length(lc)
             - lc.project(PRc_clusters[-1][-1].pos)
             + lc.project(PRc_clusters[0][0].pos)
-        ) <= 1.1 * max(list(slc_sds.values())[0], list(slc_sds.values())[-1]):
+        ) <= 1.1 * max(list(lc_sds.values())[0], list(lc_sds.values())[-1]):
             PRc_clusters[0] = Label_PRcs(PRc_clusters.pop() + PRc_clusters[0])
 
     return cast(list[Label_PRcs], PRc_clusters)
