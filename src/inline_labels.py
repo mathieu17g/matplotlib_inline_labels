@@ -1,3 +1,6 @@
+import sys
+print(f"In module products {sys.path[0]=}\n{__package__=}\n{__spec__=}")
+
 from utils import (
     # timer,
     esc,
