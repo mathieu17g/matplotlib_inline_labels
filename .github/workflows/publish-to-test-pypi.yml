@@ -20,7 +20,7 @@ jobs:
         python3 -m pip install --upgrade pip
         pip install flit
     - name: Build a binary wheel and a source tarball
-      run: flit build
+      run: flit build --no-use-vcs
     - name: Store the distribution packages
       uses: actions/upload-artifact@v4
       with:
