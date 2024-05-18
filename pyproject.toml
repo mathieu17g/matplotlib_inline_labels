@@ -4,7 +4,7 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "matplotlib_inline_labels"
-version = "0.2.1.5"
+version = "0.2.1.6"
 authors = [{name = "mathieu17g", email = "mathieu19g@icloud.com"}]
 description = "Inline line labels for matplotlib with automatic positionning"
 readme = "README.md"
