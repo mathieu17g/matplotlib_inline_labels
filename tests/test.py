@@ -13,6 +13,8 @@ import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "inline_labels"))
 print(f"{sys.path=}")
 print(f"{__package__=}")
+__package__ = "inline_labels"
+print(f"{__package__=}")
 from inline_labels import add_inline_labels
 
 
