@@ -1,10 +1,10 @@
-from datatypes import (
+from .datatypes import (
     Labelled_Line_Geometric_Data,
     Labelled_Lines_Geometric_Data_Dict,
     Line_Chunk_Geometries,
     Label_Box_Dimensions,
 )
-from utils import Timer
+from .utils import Timer
 from matplotlib.transforms import Transform, Affine2D
 from matplotlib.axes import Axes
 from matplotlib.lines import Line2D

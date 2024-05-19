@@ -1,4 +1,3 @@
-#//from operator import sub
 from matplotlib import pyplot as plt
 from matplotlib.transforms import Transform, Affine2D
 from matplotlib.container import ErrorbarContainer

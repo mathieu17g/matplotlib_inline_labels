@@ -1,4 +1,4 @@
-from datatypes import (
+from .datatypes import (
     Label_Inlining_Solutions,
     Labels_lcs_adjPRcs_groups,
     Labelled_Lines_Geometric_Data_Dict,
@@ -6,12 +6,12 @@ from datatypes import (
     SepLongestSubgroups,
 )
 
-from processing import SEP_LEVELS
+from .processing import SEP_LEVELS
 from math import isclose
 import shapely as shp
 from shapely import LineString
 import numpy as np
-from utils import Timer
+from .utils import Timer
 
 #! BEGIN algo1 imports
 # //from typing import NamedTuple
