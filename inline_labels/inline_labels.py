@@ -1,16 +1,16 @@
-from inline_labels.utils import (
+from .utils import (
     # timer,
     esc,
     Timer,
 )
-from inline_labels.datatypes import (
+from .datatypes import (
     Line_Chunk_Geometries,
     Label_Rotation_Estimates_Dict,
     Label_PRcs,
     Labels_lcs_adjPRcs_groups,
     Labels_PRcs,
 )
-from inline_labels.drawing import (
+from .drawing import (
     get_dbg_axes,
     retrieve_lines_and_labels,
     plot_geometric_line_chunks,
@@ -20,22 +20,22 @@ from inline_labels.drawing import (
     add_noninlined_labels_legend,
     add_dbg_noninlined_labels_legend,
 )
-from inline_labels.geometries import (
+from .geometries import (
     get_axe_lines_geometries,
     get_axe_lines_widths,
     update_ld_with_label_text_box_dimensions,
 )
 
-from inline_labels.preprocessing import (
+from .preprocessing import (
     update_ld_with_label_position_candidates,
 )
-from inline_labels.processing import (
+from .processing import (
     get_box_rot_and_trans_function,
     ROTATION_SAMPLES_NUMBER,
     SEP_LEVELS,
     evaluate_candidates,
 )
-from inline_labels.postprocessing import solselect_monocrit
+from .postprocessing import solselect_monocrit
 from matplotlib import pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.axes import Axes
