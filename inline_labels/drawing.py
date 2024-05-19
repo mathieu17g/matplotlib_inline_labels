@@ -12,7 +12,7 @@ from .datatypes import (
     Labels_PRcs,
     Label_Inlining_Solutions,
 )
-from processing import get_box_rot_and_trans_function
+from .processing import get_box_rot_and_trans_function
 from math import degrees
 
 
