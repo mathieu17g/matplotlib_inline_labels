@@ -10,7 +10,7 @@ from scipy.stats import loglaplace, chi2
 import os
 import sys
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", "inline_labels"))
+# sys.path.append(os.path.join(os.path.dirname(__file__), "..", "inline_labels"))
 print(f"{sys.path=}")
 print(f"{__package__=}")
 # __package__ = "inline_labels"
