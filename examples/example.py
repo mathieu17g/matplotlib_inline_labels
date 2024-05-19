@@ -5,7 +5,7 @@ from scipy.stats import chi2, loglaplace
 import os
 import sys
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", "src"))
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", "inlined_labels"))
 from inline_labels import add_inline_labels
 
 X = np.linspace(0, 1, 1000)
