@@ -1,6 +1,3 @@
-import sys
-print(f"In module products {sys.path[0]=}\n{__package__=}\n{__spec__=}\n{__file__=}")
-
 from inline_labels.utils import (
     # timer,
     esc,
