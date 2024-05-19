@@ -7,7 +7,7 @@ from matplotlib.axes import Axes
 from matplotlib.lines import Line2D
 from typing import Any
 import shapely as shp
-from datatypes import (
+from .datatypes import (
     Labelled_Lines_Geometric_Data_Dict,
     Labels_PRcs,
     Label_Inlining_Solutions,
