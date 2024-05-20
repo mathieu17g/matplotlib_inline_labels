@@ -23,6 +23,7 @@ from inline_labels import add_inline_labels
 # %%
 @pytest.mark.mpl_image_compare(style="default", savefig_kwargs={"bbox_inches": "tight"})
 def test_multiple_subplots_with_gridspec():
+    print(f"{inline_labels.__version__=}")
     X = np.linspace(0, 1, 500)
     A = [1, 2, 5, 10, 20]
     with plt.style.context("fivethirtyeight"):
