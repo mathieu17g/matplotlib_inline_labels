@@ -1,4 +1,4 @@
 __all__ = ["add_inline_labels"]
-__version__ = "0.2.1.40"
+__version__ = "0.2.1.41"
 
 from inline_labels.inlining import add_inline_labels
