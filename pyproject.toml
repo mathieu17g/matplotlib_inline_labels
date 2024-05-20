@@ -73,4 +73,4 @@ filterwarnings = [
     ]
 pythonpath = "inline_labels"
 testpaths = ["tests",]
-addopts = "-v --color=yes --mpl --cov --cov-report=xml -rxXs"
+addopts = "--numprocesses=logical -v --color=yes --mpl --cov --cov-report=xml -rxXs"
