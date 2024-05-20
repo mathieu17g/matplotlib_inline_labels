@@ -15,9 +15,9 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "..", "inline_labels"))
 # print(f"{__package__=}")
 # # __package__ = "inline_labels"
 # # print(f"{__package__=}")
-# import inline_labels
-# print(f"{inline_labels.__version__=}")
-from inlining import add_inline_labels
+import inline_labels
+print(f"{inline_labels.__version__=}")
+from inline_labels import add_inline_labels
 
 
 # %%
