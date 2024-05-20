@@ -1,4 +1,3 @@
-from inline_labels import utils
 from inline_labels.utils import (
     # timer,
     esc,
