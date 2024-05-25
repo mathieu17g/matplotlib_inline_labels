@@ -1,4 +1,4 @@
-from datatypes import (
+from .datatypes import (
     Label_Inlining_Solutions,
     Labels_lcs_adjPRcs_groups,
     Labelled_Lines_Geometric_Data_Dict,
@@ -6,25 +6,13 @@ from datatypes import (
     SepLongestSubgroups,
 )
 
-from processing import SEP_LEVELS
+from .processing import SEP_LEVELS
 from math import isclose
 import shapely as shp
 from shapely import LineString
 import numpy as np
-from utils import Timer
+from .utils import Timer
 
-#! BEGIN algo1 imports
-# //from typing import NamedTuple
-# //from datatypes import Labels_PRcs
-# //from pymoo.core.problem import ElementwiseProblem
-# //from pymoo.algorithms.moo.nsga2 import NSGA2
-# //from pymoo.optimize import minimize
-# //from scipy.spatial import ConvexHull
-# //from pymoo.operators.crossover.sbx import SBX
-# //from pymoo.operators.mutation.pm import PM
-# //from pymoo.operators.repair.rounding import RoundingRepair
-# //from pymoo.operators.sampling.rnd import IntegerRandomSampling
-#! END algo1 imports
 
 
 def argmaxs(values, keyfunc=None):
