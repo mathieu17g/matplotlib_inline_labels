@@ -30,18 +30,22 @@ def get_dbg_axes(ax: Axes) -> tuple[Axes, Axes]:
 
     fig_dbg = plt.figure(
         dpi=ax.get_figure().get_dpi(),  # pyright: ignore[reportOptionalMemberAccess]
+        figsize=(
+            ax_bbox.width * 3.2,
+            ax_bbox.height * 1.4,
+        ),  # Tweak for trying to proprely display Axes in tkAgg backend
     )
 
     pos = (0, 0, 1, 1)  # Position of the grid in the figure
-    horiz = [Size.Fixed(ax_bbox.width), Size.Fixed(1), Size.Fixed(ax_bbox.width)]
-    vert = [Size.Fixed(ax_bbox.height)]
-    divider = Divider(fig_dbg, pos, horiz, vert, aspect=False)
+    horiz = [Size.Fixed(1), Size.Fixed(ax_bbox.width), Size.Fixed(1), Size.Fixed(ax_bbox.width), Size.Fixed(1)]
+    vert = [Size.Fixed(1), Size.Fixed(ax_bbox.height), Size.Fixed(1)]
+    divider = Divider(fig_dbg, pos, horiz, vert, aspect=False, anchor="W")
 
     # Add the two Axes for debug drawing
     # TODO maybe have to handle more specific characteristics from the original Axe beyond axis scales and limits
     ax_data = fig_dbg.add_axes(
         divider.get_position(),
-        axes_locator=divider.new_locator(nx=0, ny=0),
+        axes_locator=divider.new_locator(nx=1, ny=1),
         xscale=ax.get_xscale(),
         yscale=ax.get_yscale(),
         xlim=ax.get_xlim(),
@@ -49,7 +53,7 @@ def get_dbg_axes(ax: Axes) -> tuple[Axes, Axes]:
     )
     ax_geoms = fig_dbg.add_axes(
         divider.get_position(),
-        axes_locator=divider.new_locator(nx=2, ny=0),
+        axes_locator=divider.new_locator(nx=3, ny=1),
         xscale=ax.get_xscale(),
         yscale=ax.get_yscale(),
         xlim=ax.get_xlim(),
@@ -69,9 +73,7 @@ def get_dbg_axes(ax: Axes) -> tuple[Axes, Axes]:
 
     ax_data.axis(ax.axis())
     ax_geoms.sharex(ax_data)
-    # TODO Commented because leads to wrong ax_geoms aspect -> figure out why I used that initially.
-    #// ax_data.set_aspect(get_axe_aspect(ax), adjustable="box")
-    #// ax_geoms.set_aspect(get_axe_aspect(ax), adjustable="datalim")
+
     fig_dbg.canvas.draw()
     return ax_data, ax_geoms
 
@@ -92,21 +94,21 @@ def retrieve_lines_and_labels(ax: Axes) -> tuple[list[Line2D], list[str]]:
     return linelikeHandles, linelikeLabels
 
 
-#//def get_axe_aspect(ax: Axes) -> float:
-#//    """Computes the drawn data aspect radio of an Axe to circumvemt 'auto' value
-#//    returned by matplotlib.axes.Axes.get_aspect.
-#//    Solution found at https://stackoverflow.com/questions/41597177/get-aspect-ratio-of-axes
-#//    """
-#//    # Total figure size
-#//    (
-#//        figW,
-#//        figH,
-#//    ) = ax.get_figure().get_size_inches()  # pyright: ignore[reportOptionalMemberAccess]
-#//    _, _, w, h = ax.get_position().bounds  # Axis size on figure
-#//    disp_ratio = (figH * h) / (figW * w)  # Ratio of display units
-#//    # Ratio of data units. Negative over negative because of the order of subtraction
-#//    data_ratio = sub(*ax.get_ylim()) / sub(*ax.get_xlim())
-#//    return disp_ratio / data_ratio
+# //def get_axe_aspect(ax: Axes) -> float:
+# //    """Computes the drawn data aspect radio of an Axe to circumvemt 'auto' value
+# //    returned by matplotlib.axes.Axes.get_aspect.
+# //    Solution found at https://stackoverflow.com/questions/41597177/get-aspect-ratio-of-axes
+# //    """
+# //    # Total figure size
+# //    (
+# //        figW,
+# //        figH,
+# //    ) = ax.get_figure().get_size_inches()  # pyright: ignore[reportOptionalMemberAccess]
+# //    _, _, w, h = ax.get_position().bounds  # Axis size on figure
+# //    disp_ratio = (figH * h) / (figW * w)  # Ratio of display units
+# //    # Ratio of data units. Negative over negative because of the order of subtraction
+# //    data_ratio = sub(*ax.get_ylim()) / sub(*ax.get_xlim())
+# //    return disp_ratio / data_ratio
 
 
 def get_geom2disp_trans(ax: Axes) -> Transform:

@@ -9,7 +9,7 @@ from dateutil.relativedelta import relativedelta
 import os
 import sys
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", "inlined_labels"))
+sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 from inline_labels import add_inline_labels
 
 X = np.linspace(0, 1, 1000)
