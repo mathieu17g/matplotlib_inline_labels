@@ -1,5 +1,15 @@
 # `matplotlib_inline_labels` news
 
+## v0.2.2 Release Notes
+This realase brings:
+- Bug fixes
+- Test enhancements
+
+### Bug fixes
+---
+- Fixed debug figure display on interactive display backends (tested for tkAgg)
+- Fixed imports from different modules, which were broken since v0.2.1 when code was splitted into several modules 
+
 ## v0.2.1 Release Notes
 This realase brings:
 - Bug fixes
