@@ -42,7 +42,7 @@ test = [
 name = "inline_labels"
 
 [tool.flit.sdist]
-include = ["*.py"]
+include = ["*.py", "*.md", "LICENSE"]
 
 [tool.pyright]
 include = ["inline_labels"]
