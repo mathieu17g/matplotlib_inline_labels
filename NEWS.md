@@ -1,6 +1,7 @@
 # `matplotlib_inline_labels` news
 
 ## v0.2.2 Release Notes
+
 This release brings:
 - Bug fixes
 - Test enhancements
@@ -10,7 +11,7 @@ This release brings:
 - Fixed debug figure display on interactive display backends (tested for tkAgg)
 - Fixed imports from different modules, which were broken since v0.2.1 when the code was split into several modules 
 
-## Miscellenous
+### Miscellaneous
 ---
 - Added a 1st visual unitary test to be run manually to check the display on interactive backends, since pytest-mpl only uses saved figures and may miss some issues
 
