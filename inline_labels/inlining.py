@@ -3,13 +3,8 @@ from inline_labels.utils import (
     esc,
     Timer,
 )
-<<<<<<<< HEAD:inline_labels/inline_labels.py
-from datatypes import (
-    IFLineChunkGeoms,
-========
 from inline_labels.datatypes import (
-    Line_Chunk_Geometries,
->>>>>>>> main:inline_labels/inlining.py
+    IFLineChunkGeoms,
     Label_Rotation_Estimates_Dict,
     Label_PRcs,
     Labels_lcs_adjPRcs_groups,
@@ -41,11 +36,7 @@ from inline_labels.processing import (
     SEP_LEVELS,
     evaluate_candidates,
 )
-<<<<<<<< HEAD:inline_labels/inline_labels.py
-from postprocessing import solselect_monocrit, solselect_multicrit
-========
-from inline_labels.postprocessing import solselect_monocrit
->>>>>>>> main:inline_labels/inlining.py
+from inline_labels.postprocessing import solselect_monocrit, solselect_multicrit
 from matplotlib import pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.axes import Axes
