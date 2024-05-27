@@ -18,7 +18,7 @@ This realase brings:
 
 ### Bug fixes
 ---
-- <span style="color:red">**TODO**</span> Fixed github action for automatic github release creation with notes extraction from `NEWs.md`
+- <span style="color:red">**TODO**</span> Fixed github action for automatic github release creation with notes extraction from `NEWs.md`. Added an entry in pyproject.toml to include `NEWs.md` in sdist, in case that is where the NEWS.md file is search. To be checked at the next release
 
 
 ## v0.2.2 Release Notes
