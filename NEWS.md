@@ -1,6 +1,6 @@
 # `matplotlib_inline_labels` news
 
-## v0.2.2 Release Notes
+## v0.3.0 Release Notes
 This realase brings:
 - ...
 
