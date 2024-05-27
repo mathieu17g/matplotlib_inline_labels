@@ -3,7 +3,7 @@ from typing import Any, Callable, get_args, cast, Literal
 import numpy as np
 import numpy.ma as ma
 from nptyping import NDArray, Shape, Float, Object
-from datatypes import (
+from .datatypes import (
     lc_isclosed,
     LabelBBDims,
     Labelled_Lines_Geometric_Data_Dict,
@@ -23,7 +23,7 @@ from datatypes import (
 )
 import shapely as shp
 from shapely import Point, LineString
-from utils import Timer
+from .utils import Timer
 from shapely import GeometryType as GT
 from tqdm import tqdm
 from contextlib import nullcontext

@@ -1,4 +1,3 @@
-# //from operator import sub
 from matplotlib import pyplot as plt
 from matplotlib.transforms import Transform, Affine2D
 from matplotlib.container import ErrorbarContainer
@@ -7,13 +6,13 @@ from matplotlib.axes import Axes
 from matplotlib.lines import Line2D
 from typing import Any
 import shapely as shp
-from datatypes import (
+from .datatypes import (
     Labelled_Lines_Geometric_Data_Dict,
     Labels_PRcs,
     Label_Inlining_Solutions,
     PLACEMENT_ALGORITHM_OPTIONS,
 )
-from processing import get_box_rot_and_trans_function
+from .processing import get_box_rot_and_trans_function
 from math import degrees
 
 
@@ -32,18 +31,22 @@ def get_dbg_axes(ax: Axes) -> tuple[Axes, Axes]:
 
     fig_dbg = plt.figure(
         dpi=ax.get_figure().get_dpi(),  # pyright: ignore[reportOptionalMemberAccess]
+        figsize=(
+            ax_bbox.width * 3.2,
+            ax_bbox.height * 1.4,
+        ),  # Tweak for trying to proprely display Axes in tkAgg backend
     )
 
     pos = (0, 0, 1, 1)  # Position of the grid in the figure
-    horiz = [Size.Fixed(ax_bbox.width), Size.Fixed(1), Size.Fixed(ax_bbox.width)]
-    vert = [Size.Fixed(ax_bbox.height)]
-    divider = Divider(fig_dbg, pos, horiz, vert, aspect=False)
+    horiz = [Size.Fixed(1), Size.Fixed(ax_bbox.width), Size.Fixed(1), Size.Fixed(ax_bbox.width), Size.Fixed(1)]
+    vert = [Size.Fixed(1), Size.Fixed(ax_bbox.height), Size.Fixed(1)]
+    divider = Divider(fig_dbg, pos, horiz, vert, aspect=False, anchor="W")
 
     # Add the two Axes for debug drawing
     # TODO maybe have to handle more specific characteristics from the original Axe beyond axis scales and limits
     ax_data = fig_dbg.add_axes(
         divider.get_position(),
-        axes_locator=divider.new_locator(nx=0, ny=0),
+        axes_locator=divider.new_locator(nx=1, ny=1),
         xscale=ax.get_xscale(),
         yscale=ax.get_yscale(),
         xlim=ax.get_xlim(),
@@ -51,7 +54,7 @@ def get_dbg_axes(ax: Axes) -> tuple[Axes, Axes]:
     )
     ax_geoms = fig_dbg.add_axes(
         divider.get_position(),
-        axes_locator=divider.new_locator(nx=2, ny=0),
+        axes_locator=divider.new_locator(nx=3, ny=1),
         xscale=ax.get_xscale(),
         yscale=ax.get_yscale(),
         xlim=ax.get_xlim(),

@@ -1,7 +1,7 @@
 import numpy as np
 import shapely as shp
-from utils import Timer
-from datatypes import (
+from .utils import Timer
+from .datatypes import (
     lc_isclosed,
     Labelled_Lines_Geometric_Data_Dict,
 )

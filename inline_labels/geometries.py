@@ -1,11 +1,11 @@
-from datatypes import (
+from .datatypes import (
     CCTOL,
     LabelledLineGeometricData,
     Labelled_Lines_Geometric_Data_Dict,
     IFLineChunkGeoms,
     LabelBBDims,
 )
-from utils import Timer
+from .utils import Timer
 from matplotlib.transforms import Transform, Affine2D
 from matplotlib.axes import Axes
 from matplotlib.lines import Line2D
